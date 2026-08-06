@@ -1,0 +1,75 @@
+/* style.css — High-contrast outdoor theme: black background, yellow accents, big touch targets */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, Roboto, Arial, sans-serif;
+  background: #0a0a0a;
+  color: #fff;
+}
+.header {
+  background: #111;
+  border-bottom: 3px solid #F5C518;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.logo { font-size: 22px; font-weight: 900; color: #F5C518; }
+.brand-sub { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 1px; margin-top: 2px; }
+.tag { font-size: 11px; color: #F5C518; opacity: 0.8; }
+.footer { text-align: center; padding: 20px; font-size: 12px; color: #666; border-top: 1px solid #222; margin-top: 20px; }
+.container { padding: 16px; max-width: 500px; margin: 0 auto; }
+.card {
+  background: #161616;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+label { display: block; font-size: 13px; font-weight: 700; color: #F5C518; margin-bottom: 6px; text-transform: uppercase; }
+input, select {
+  width: 100%;
+  padding: 16px;
+  font-size: 18px;
+  background: #000;
+  border: 2px solid #444;
+  border-radius: 8px;
+  color: #fff;
+  margin-bottom: 16px;
+}
+input:focus { border-color: #F5C518; outline: none; }
+.type-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.type-btn {
+  flex: 1; padding: 20px; text-align: center; border-radius: 10px;
+  border: 2px solid #444; background: #000; color: #fff; font-weight: 700; cursor: pointer;
+}
+.type-btn.selected { background: #F5C518; color: #000; border-color: #F5C518; }
+button.primary {
+  width: 100%; padding: 18px; font-size: 18px; font-weight: 800;
+  background: #16A34A; color: #fff; border: none; border-radius: 10px; cursor: pointer;
+}
+button.scan {
+  width: 100%; padding: 18px; font-size: 16px; font-weight: 800;
+  background: #F5C518; color: #000; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 16px;
+}
+button.secondary {
+  padding: 10px 16px; background: #222; color: #fff; border: 1px solid #444; border-radius: 8px; cursor: pointer;
+}
+.result { padding: 16px; border-radius: 10px; margin-top: 16px; font-weight: 700; }
+.result.sub { background: #14351f; border: 2px solid #16A34A; }
+.result.paid { background: #1a2a42; border: 2px solid #3B82F6; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab { flex: 1; padding: 14px; text-align: center; background: #161616; border: 1px solid #333; border-radius: 8px; cursor: pointer; font-weight: 700; }
+.tab.active { background: #F5C518; color: #000; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 10px; border-bottom: 1px solid #333; }
+.expired { color: #ef4444; }
+.status { text-align: center; font-size: 14px; color: #aaa; margin: 8px 0; }
+.summary-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.summary-card { flex: 1; min-width: 140px; background: #161616; border: 1px solid #333; border-radius: 10px; padding: 16px; text-align: center; }
+.summary-card .label { font-size: 12px; color: #aaa; text-transform: uppercase; }
+.summary-card .value { font-size: 24px; font-weight: 900; margin-top: 6px; }
+.income { color: #16A34A; }
+.expense { color: #ef4444; }
+.net { color: #F5C518; }

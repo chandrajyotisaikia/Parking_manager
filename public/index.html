@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Smart Gate Terminal</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#F5C518">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">PARKPRO</div>
+    <div class="brand-sub">TULON'S PARKING</div>
+    <div class="tag">SMART GATE TERMINAL — HIGH-CONTRAST OUTDOOR MODE</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="tabs">
+    <div class="tab active" id="tabGate" onclick="showTab('gate')">Gate Entry</div>
+    <div class="tab" id="tabExpense" onclick="showTab('expense')">Expenses</div>
+  </div>
+
+  <div style="text-align:right; margin-bottom:12px;">
+    <a href="/admin.html" style="color:#F5C518; font-size:13px;">Desktop CRM Dashboard →</a>
+  </div>
+
+  <div class="card">
+    <label>Attendant Name</label>
+    <input type="text" id="attendantName" placeholder="Your name">
+  </div>
+
+  <!-- GATE ENTRY -->
+  <div id="gateSection">
+    <div class="card">
+      <label>Scan or Enter Plate</label>
+      <button class="scan" onclick="startScan()">📷 Scan Plate with Camera</button>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
+      <div class="status" id="ocrStatus"></div>
+
+      <input type="text" id="plateInput" placeholder="e.g. KA01AB1234" autocapitalize="characters">
+
+      <label>Vehicle Type</label>
+      <div class="type-row">
+        <div class="type-btn selected" id="btnCar" onclick="selectType('CAR')">🚗 Car (₹80)</div>
+        <div class="type-btn" id="btnBike" onclick="selectType('BIKE')">🏍️ Bike (₹40)</div>
+      </div>
+
+      <button class="primary" onclick="checkIn()">✓ Check In Vehicle</button>
+
+      <div id="resultBox"></div>
+    </div>
+  </div>
+
+  <!-- EXPENSES -->
+  <div id="expenseSection" style="display:none">
+    <div class="card">
+      <label>Amount (₹)</label>
+      <input type="number" id="expAmount" placeholder="0">
+      <label>Description</label>
+      <input type="text" id="expDesc" placeholder="e.g. Fuel, maintenance, snacks">
+      <label>Date</label>
+      <input type="date" id="expDate">
+      <button class="primary" onclick="submitExpense()">Log Expense</button>
+      <div id="expenseResult"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="/gate.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(() => console.log('Service worker registered'));
+}
+document.getElementById('expDate').valueAsDate = new Date();
+
+// Remember the attendant's name between visits
+const savedName = localStorage.getItem('attendantName');
+if (savedName) document.getElementById('attendantName').value = savedName;
+document.getElementById('attendantName').addEventListener('change', (e) => {
+  localStorage.setItem('attendantName', e.target.value);
+});
+
+// Device-aware default: on a wide (desktop-sized) screen, send the user to the CRM dashboard instead.
+if (window.innerWidth > 900 && !sessionStorage.getItem('skipDesktopRedirect')) {
+  window.location.href = '/admin.html';
+}
+</script>
+</body>
+</html>
