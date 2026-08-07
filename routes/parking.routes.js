@@ -1,4 +1,4 @@
-// routes/parking.routes.js — just wires URLs to controller functions, no logic here
+// routes/parking.routes.js — wires URLs to controller functions
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/parking.controller');
@@ -8,6 +8,12 @@ router.get('/check-subscriber/:plate', ctrl.quickCheckSubscriber);
 router.get('/entries', ctrl.getEntries);
 router.get('/entries/active', ctrl.getActiveEntries);
 router.post('/entries/:id/exit', ctrl.markExit);
+
+// Dues & Payment Routes
+router.get('/dues/unpaid', ctrl.getUnpaidEntries);
+router.get('/dues/:plate', ctrl.checkBalance);
+router.post('/entries/:id/pay', ctrl.markPaid);
+
 router.get('/settings', ctrl.getSettingsHandler);
 router.post('/settings', ctrl.postSettingsHandler);
 router.post('/subscribers', ctrl.postSubscriber);
