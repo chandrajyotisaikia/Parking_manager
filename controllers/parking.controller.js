@@ -3,6 +3,7 @@ const { pool } = require('../db/db');
 const { calculateCharge } = require('../services/pricing.service');
 const { checkSubscriber, addSubscriber, listSubscribers, listExpiringSubscribers } = require('../services/subscriber.service');
 const { addExpense, listExpenses, totalExpenses } = require('../services/expense.service');
+const { getSettings, updateSettings } = require('../services/settings.service');
 
 // POST /api/verify-and-log
 async function verifyAndLog(req, res) {
@@ -182,9 +183,21 @@ async function markExit(req, res) {
   }
 }
 
+// GET /api/settings — current display settings
+async function getSettingsHandler(req, res) {
+  return res.json({ success: true, settings: await getSettings() });
+}
+
+// POST /api/settings — update display settings (used by the admin dashboard)
+async function postSettingsHandler(req, res) {
+  const updated = await updateSettings(req.body);
+  return res.json({ success: true, settings: updated });
+}
+
 module.exports = {
   verifyAndLog, quickCheckSubscriber, getEntries,
   postSubscriber, getSubscribers, getExpiringSubscribers,
   postExpense, getExpenses, getSummary, exportReport,
   getActiveEntries, markExit,
+  getSettingsHandler, postSettingsHandler,
 };
