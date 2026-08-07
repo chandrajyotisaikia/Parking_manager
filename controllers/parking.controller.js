@@ -1,6 +1,6 @@
 // controllers/parking.controller.js — receives requests, calls services, sends responses
 const { pool } = require('../db/db');
-const { calculateCharge } = require('../services/pricing.service');
+const { calculateCharge, calculateSubscriptionAmount } = require('../services/pricing.service');
 const { checkSubscriber, addSubscriber, listSubscribers, listExpiringSubscribers } = require('../services/subscriber.service');
 const { addExpense, listExpenses, totalExpenses } = require('../services/expense.service');
 const { getSettings, updateSettings } = require('../services/settings.service');
@@ -61,13 +61,14 @@ async function getEntries(req, res) {
 
 // POST /api/subscribers
 async function postSubscriber(req, res) {
-  const { vehicleNumber, ownerName, phone, vehicleType, subscriptionEnd } = req.body;
-  if (!vehicleNumber || !ownerName || !vehicleType || !subscriptionEnd) {
+  const { vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, paymentStatus } = req.body;
+  if (!vehicleNumber || !ownerName || !vehicleType || !subscriptionStart || !subscriptionEnd) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
   try {
-    await addSubscriber({ vehicleNumber, ownerName, phone, vehicleType, subscriptionEnd });
-    return res.status(201).json({ success: true });
+    const amountDue = calculateSubscriptionAmount(vehicleType, subscriptionStart, subscriptionEnd);
+    const sub = await addSubscriber({ vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, amountDue, paymentStatus });
+    return res.status(201).json({ success: true, subscriber: sub, amountDue });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }
