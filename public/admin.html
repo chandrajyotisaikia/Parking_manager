@@ -6,49 +6,205 @@
 <title>Smart Parking — Admin CRM</title>
 <link rel="stylesheet" href="/style.css">
 <style>
-  body { max-width: 900px; margin: 0 auto; }
-  .container { max-width: 900px; }
-  #loginScreen { max-width: 360px; margin: 80px auto; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-  /* Professional CRM look — only applies on desktop-sized screens.
-     Below 900px width, the page falls back to the normal high-contrast theme from style.css. */
-  @media (min-width: 900px) {
-    body { max-width: none; background: #F4F6F9; color: #1E2733; font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
-    .header { background: #fff; border-bottom: 1px solid #E2E8F0; padding: 20px 32px; }
-    .logo { color: #1E2733; }
-    .brand-sub { color: #2563EB; }
-    .tag { color: #64748B; }
-    .container { max-width: 1100px; padding: 32px; }
-    .summary-row { gap: 20px; }
-    .summary-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-    .summary-card .label { color: #64748B; }
-    .income { color: #16A34A; } .expense { color: #DC2626; } .net { color: #2563EB; }
+  /* Base Reset & Global Styles for Admin */
+  body { 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #F8FAFC; 
+    color: #0F172A;
+    margin: 0; 
+    padding: 0;
+    max-width: none;
+  }
 
-    .tabs { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 6px; gap: 4px; }
-    .tab { background: transparent; color: #475569; border-radius: 8px; font-weight: 600; }
-    .tab.active { background: #2563EB; color: #fff; }
+  /* Header */
+  .header { 
+    background: #ffffff; 
+    border-bottom: 1px solid #E2E8F0; 
+    padding: 20px 32px; 
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .header-text { display: flex; flex-direction: column; }
+  .logo { font-size: 22px; font-weight: 700; color: #0F172A; letter-spacing: -0.5px; }
+  .brand-sub { font-size: 14px; font-weight: 600; color: #2563EB; margin-top: 2px; }
+  .tag { font-size: 12px; font-weight: 500; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 6px; }
+  .header a { 
+    color: #64748B; 
+    text-decoration: none; 
+    font-size: 14px; 
+    font-weight: 500; 
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .header a:hover { color: #0F172A; background-color: #F1F5F9; }
 
-    .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); color: #1E2733; }
-    label { color: #475569; }
-    input, select { background: #F8FAFC; border: 1px solid #CBD5E1; color: #1E2733; }
-    input:focus { border-color: #2563EB; }
-    button.primary { background: #2563EB; }
-    th { color: #64748B; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #E2E8F0; }
-    td { border-bottom: 1px solid #F1F5F9; }
-    .expired { color: #DC2626; }
-    .footer { color: #94A3B8; border-top: 1px solid #E2E8F0; }
+  /* Layout Container */
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+  #loginScreen { max-width: 380px; margin: 100px auto; }
+
+  /* Dashboard Metric Cards */
+  .summary-row { 
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  .summary-card { 
+    background: #ffffff; 
+    border: 1px solid #E2E8F0; 
+    border-radius: 12px; 
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+  }
+  .summary-card .label { font-size: 13px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-card .value { font-size: 32px; font-weight: 700; margin-top: 8px; }
+  .income { color: #16A34A; } 
+  .expense { color: #DC2626; } 
+  .net { color: #2563EB; }
+
+  /* Navigation Tabs */
+  .tabs { 
+    display: flex;
+    flex-wrap: wrap;
+    background: #ffffff; 
+    border: 1px solid #E2E8F0; 
+    border-radius: 12px; 
+    padding: 8px; 
+    gap: 8px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .tab { 
+    padding: 10px 16px;
+    background: transparent; 
+    color: #475569; 
+    border-radius: 8px; 
+    font-weight: 500; 
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  .tab:hover { background: #F1F5F9; color: #0F172A; }
+  .tab.active { background: #2563EB; color: #ffffff; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); }
+
+  /* Main Content Panels */
+  .card { 
+    background: #ffffff; 
+    border: 1px solid #E2E8F0; 
+    border-radius: 12px; 
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+    color: #1E2733; 
+    margin-bottom: 24px;
+  }
+
+  /* Forms & Inputs */
+  label { 
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+    margin-bottom: 8px;
+    margin-top: 16px;
+  }
+  label:first-child { margin-top: 0; }
+  input[type="text"], input[type="password"], input[type="date"], select { 
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    background-color: #F8FAFC;
+    color: #0F172A;
+    transition: all 0.2s;
+    box-sizing: border-box;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    background-color: #ffffff;
+  }
+  input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2563EB; cursor: pointer; }
+
+  /* Buttons */
+  button.primary { 
+    background: #2563EB; 
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    width: 100%;
+    margin-top: 24px;
+  }
+  button.primary:hover { background: #1D4ED8; }
+  button.primary:active { transform: scale(0.98); }
+
+  /* Data Tables */
+  table { 
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    text-align: left;
+  }
+  th { 
+    padding: 14px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #E2E8F0;
+    background: #F8FAFC;
+  }
+  th:first-child { border-top-left-radius: 8px; }
+  th:last-child { border-top-right-radius: 8px; }
+  td { 
+    padding: 16px;
+    font-size: 14px;
+    color: #334155;
+    border-bottom: 1px solid #F1F5F9;
+  }
+  tbody tr { transition: background-color 0.15s; }
+  tbody tr:hover { background-color: #F8FAFC; }
+  tbody tr:last-child td { border-bottom: none; }
+  
+  /* Status Indicators */
+  .expired { color: #DC2626; font-weight: 500; background: #FEE2E2; padding: 4px 10px; border-radius: 12px; font-size: 12px; }
+
+  /* Footer */
+  .footer { 
+    text-align: center;
+    color: #94A3B8; 
+    border-top: 1px solid #E2E8F0; 
+    padding: 24px;
+    font-size: 13px;
+    margin-top: 40px;
   }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div>
+  <div class="header-text">
     <div class="logo">PARKPRO</div>
     <div class="brand-sub">TULON'S PARKING</div>
     <div class="tag">ADMIN CRM DASHBOARD</div>
   </div>
-  <a href="/" onclick="sessionStorage.setItem('skipDesktopRedirect','true')" style="color:#F5C518; font-size:13px;">← Gate Entry</a>
+  <a href="/" onclick="sessionStorage.setItem('skipDesktopRedirect','true')">← Gate Entry</a>
 </div>
 
 <!-- LOGIN GATE -->
@@ -57,7 +213,7 @@
     <label>Admin Password</label>
     <input type="password" id="loginPassword" placeholder="Enter password">
     <button class="primary" onclick="tryLogin()">Login</button>
-    <div id="loginError" style="color:#ef4444; margin-top:10px;"></div>
+    <div id="loginError" style="color:#ef4444; margin-top:12px; font-size:14px; font-weight:500;"></div>
   </div>
 </div>
 
@@ -82,36 +238,42 @@
   </div>
 
   <div id="entriesPanel" class="card">
-    <table><thead><tr><th>Plate</th><th>Type</th><th>Amount</th><th>Attendant</th><th>Time</th></tr></thead>
-      <tbody id="entriesBody"></tbody></table>
+    <div style="overflow-x: auto;">
+      <table><thead><tr><th>Plate</th><th>Type</th><th>Amount</th><th>Attendant</th><th>Time</th></tr></thead>
+        <tbody id="entriesBody"></tbody></table>
+    </div>
   </div>
 
   <div id="subsPanel" class="card" style="display:none">
-    <table><thead><tr><th>Plate</th><th>Owner</th><th>Phone</th><th>Expires</th><th>Amount</th><th>Status</th></tr></thead>
-      <tbody id="subsBody"></tbody></table>
+    <div style="overflow-x: auto;">
+      <table><thead><tr><th>Plate</th><th>Owner</th><th>Phone</th><th>Expires</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody id="subsBody"></tbody></table>
+    </div>
   </div>
 
   <div id="addsubPanel" class="card" style="display:none">
-    <label>Vehicle Number</label><input type="text" id="newPlate">
-    <label>Owner Name</label><input type="text" id="newOwner">
-    <label>Phone</label><input type="text" id="newPhone">
+    <label>Vehicle Number</label><input type="text" id="newPlate" placeholder="e.g. AS 01 AB 1234">
+    <label>Owner Name</label><input type="text" id="newOwner" placeholder="Full Name">
+    <label>Phone</label><input type="text" id="newPhone" placeholder="10-digit number">
     <label>Vehicle Type</label>
     <select id="newType" onchange="updateSubAmountPreview()"><option value="CAR">Car</option><option value="BIKE">Bike</option></select>
     <label>Subscription Start Date</label><input type="date" id="newStart" onchange="updateSubAmountPreview()">
     <label>Subscription End Date</label><input type="date" id="newEnd" onchange="updateSubAmountPreview()">
-    <div id="subAmountPreview" class="status" style="text-align:left;"></div>
+    <div id="subAmountPreview" class="status" style="text-align:left; margin-top:8px; font-weight:600; color:#2563EB;"></div>
     <label>Payment Status</label>
     <select id="newPaymentStatus">
       <option value="PAID">Paid in full</option>
       <option value="CREDIT">On credit (owed)</option>
     </select>
     <button class="primary" onclick="addSubscriber()">Add Subscriber</button>
-    <div id="addSubResult"></div>
+    <div id="addSubResult" style="margin-top:12px; font-weight:500;"></div>
   </div>
 
   <div id="expensesPanel" class="card" style="display:none">
-    <table><thead><tr><th>Date</th><th>Description</th><th>Attendant</th><th>Amount</th></tr></thead>
-      <tbody id="expensesBody"></tbody></table>
+    <div style="overflow-x: auto;">
+      <table><thead><tr><th>Date</th><th>Description</th><th>Attendant</th><th>Amount</th></tr></thead>
+        <tbody id="expensesBody"></tbody></table>
+    </div>
   </div>
 
   <div id="exportPanel" class="card" style="display:none">
@@ -119,9 +281,9 @@
     <input type="date" id="exportStart">
     <label>To Date</label>
     <input type="date" id="exportEnd">
-    <div style="font-size:13px; color:#aaa; margin-bottom:16px;">Maximum range: 31 days.</div>
+    <div style="font-size:13px; color:#64748B; margin-top:8px; margin-bottom:16px;">Maximum range: 31 days.</div>
     <button class="primary" onclick="downloadReport()">⬇ Download Report (CSV)</button>
-    <div id="exportResult"></div>
+    <div id="exportResult" style="margin-top:12px; font-weight:500;"></div>
   </div>
 
   <div id="displayPanel" class="card" style="display:none">
@@ -131,12 +293,12 @@
       <option value="large">Large</option>
       <option value="xl">Extra Large</option>
     </select>
-    <label style="margin-top:16px; display:flex; align-items:center; gap:8px; text-transform:none;">
+    <label style="margin-top:20px; display:flex; align-items:center; gap:10px; text-transform:none; cursor:pointer;">
       <input type="checkbox" id="settingMinimal" style="width:auto; margin:0;"> Minimalistic Design (gate app)
     </label>
-    <button class="primary" onclick="saveDisplaySettings()" style="margin-top:16px;">Save Settings</button>
-    <div id="settingsResult"></div>
-    <div style="font-size:13px; color:#94A3B8; margin-top:12px;">Changes apply the next time the gate app is opened or refreshed on the attendant's phone.</div>
+    <button class="primary" onclick="saveDisplaySettings()" style="margin-top:24px;">Save Settings</button>
+    <div id="settingsResult" style="margin-top:12px; font-weight:500;"></div>
+    <div style="font-size:13px; color:#94A3B8; margin-top:16px; background:#F8FAFC; padding:12px; border-radius:8px;">ℹ️ Changes apply the next time the gate app is opened or refreshed on the attendant's phone.</div>
   </div>
 
 </div>
