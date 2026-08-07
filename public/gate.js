@@ -1,4 +1,4 @@
-// gate.js — gate check-in screen: manual entry, camera OCR + AI vehicle-type detection,
+// gate.js — gate check-in screen: manual entry, camera Cloud OCR,
 // name locking, live charge preview, receipts, vehicle exit, expense logging, display settings.
 
 let selectedType = 'CAR';
@@ -10,7 +10,6 @@ function selectType(type) {
   updateChargePreview();
 }
 
-// Upgrade: tells the attendant what to charge before they even tap Check In
 function updateChargePreview() {
   const amt = selectedType === 'CAR' ? 80 : 40;
   const el = document.getElementById('chargePreview');
@@ -25,8 +24,6 @@ function showTab(tab) {
 }
 
 // ---- Attendant name lock ----
-// Once confirmed, the field locks. Editing after that requires the admin password,
-// so a name can't be casually changed mid-shift by mistake.
 function applyNameLockUI() {
   const locked = localStorage.getItem('attendantNameLocked') === 'true';
   const nameInput = document.getElementById('attendantName');
@@ -46,18 +43,7 @@ function confirmName() {
   applyNameLockUI();
 }
 
-function unlockName() {
-  const pwd = prompt('Enter admin password to edit the attendant name:');
-  if (pwd === null) return;
-  if (pwd === 'LoginPwd') {
-    localStorage.setItem('attendantNameLocked', 'false');
-    applyNameLockUI();
-  } else {
-    alert('Incorrect password.');
-  }
-}
-
-// ---- Display settings (set from the admin dashboard) ----
+// Display settings
 async function applyDisplaySettings() {
   try {
     const res = await fetch('/api/settings');
@@ -73,15 +59,7 @@ async function applyDisplaySettings() {
   }
 }
 
-// ---- Camera: OCR plate reading + free on-device AI vehicle-type detection ----
-// coco-ssd is a free, client-side object detection model (no API key, no account) —
-// it can recognize "car" vs "motorcycle" in the photo, so the type can be auto-filled.
-let cocoModel = null;
-async function getCocoModel() {
-  if (!cocoModel) cocoModel = await cocoSsd.load();
-  return cocoModel;
-}
-
+// ---- Camera: Lightning Fast Cloud OCR (OCR.space) ----
 function startScan() {
   document.getElementById('cameraInput').click();
 }
@@ -91,80 +69,54 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   if (!file) return;
 
   const statusEl = document.getElementById('ocrStatus');
-  statusEl.textContent = '📷 Photo captured. Analyzing...';
+  statusEl.textContent = '☁️ Uploading to Cloud AI...';
 
   try {
-    const imageBitmap = await createImageBitmap(file);
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    reader.onload = async () => {
+      const base64Image = reader.result;
+      statusEl.textContent = '🔍 Scanning plate number...';
 
-    // Original color canvas — used for AI vehicle-type detection
-    const colorCanvas = document.createElement('canvas');
-    colorCanvas.width = imageBitmap.width;
-    colorCanvas.height = imageBitmap.height;
-    colorCanvas.getContext('2d').drawImage(imageBitmap, 0, 0);
+      const formData = new FormData();
+      formData.append('base64Image', base64Image);
+      // NOTE: 'helloworld' works for basic testing. 
+      // To prevent limits in production, get a free key at ocr.space and paste it here:
+      formData.append('apikey', 'helloworld'); 
+      formData.append('language', 'eng');
+      formData.append('OCREngine', '2'); // Engine 2 is optimized for special text layouts
 
-    // Best-effort vehicle type detection — never blocks the OCR flow if it fails
-    try {
-      statusEl.textContent = '🚙 Detecting vehicle type...';
-      const model = await getCocoModel();
-      const predictions = await model.detect(colorCanvas);
-      const vehiclePred = predictions
-        .filter(p => ['car', 'motorcycle', 'truck', 'bus'].includes(p.class))
-        .sort((a, b) => b.score - a.score)[0];
-      if (vehiclePred) {
-        const detectedType = vehiclePred.class === 'motorcycle' ? 'BIKE' : 'CAR';
-        selectType(detectedType);
-        statusEl.textContent = `🚙 Detected: ${detectedType === 'BIKE' ? 'Bike' : 'Car'} (${Math.round(vehiclePred.score * 100)}% confidence). `;
+      const response = await fetch('https://api.ocr.space/parse/image', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.IsErroredOnProcessing || !data.ParsedResults || data.ParsedResults.length === 0) {
+        statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
+        return;
       }
-    } catch (visionErr) {
-      console.warn('[vehicle detection]', visionErr);
-    }
 
-    // Preprocess for OCR: grayscale + auto-brightness threshold
-    const ocrCanvas = document.createElement('canvas');
-    ocrCanvas.width = imageBitmap.width;
-    ocrCanvas.height = imageBitmap.height;
-    const ctx = ocrCanvas.getContext('2d');
-    ctx.drawImage(imageBitmap, 0, 0);
-    const imgData = ctx.getImageData(0, 0, ocrCanvas.width, ocrCanvas.height);
-    const data = imgData.data;
+      const rawText = data.ParsedResults[0].ParsedText || '';
+      const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-    let totalLuminance = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      totalLuminance += 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
-    }
-    const avgLuminance = totalLuminance / (data.length / 4);
-    const threshold = avgLuminance * 0.85;
+      if (!cleaned) {
+        statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
+        return;
+      }
 
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
-      const contrasted = gray > threshold ? 255 : 0;
-      data[i] = data[i + 1] = data[i + 2] = contrasted;
-    }
-    ctx.putImageData(imgData, 0, 0);
-
-    statusEl.textContent += ' 🔍 Reading plate text (first scan can take ~30s to load)...';
-
-    const result = await Tesseract.recognize(ocrCanvas, 'eng', {
-      logger: (m) => {
-        if (m.status === 'recognizing text') {
-          statusEl.textContent = `🔍 Reading plate... ${Math.round(m.progress * 100)}%`;
-        }
-      },
-    });
-
-    const rawText = result.data.text || '';
-    const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-    if (!cleaned) {
-      statusEl.textContent = "⚠️ Couldn't read the plate — try again or type it manually below.";
-      return;
-    }
-
-    document.getElementById('plateInput').value = cleaned;
-    statusEl.textContent = `✅ Recognized: "${cleaned}" — please check it's correct before confirming.`;
+      document.getElementById('plateInput').value = cleaned;
+      statusEl.textContent = `✅ Recognized: "${cleaned}" — check it before confirming.`;
+    };
+    
+    reader.onerror = () => {
+      statusEl.textContent = "⚠️ Error reading image file.";
+    };
   } catch (err) {
     console.error('[scan error]', err);
-    statusEl.textContent = "⚠️ Scan failed — try again or type the plate manually below.";
+    statusEl.textContent = "⚠️ Scan failed — try typing the plate manually.";
   } finally {
     e.target.value = '';
   }
@@ -206,9 +158,6 @@ async function checkIn() {
   }
 }
 
-// Fix: previously this built the share text inline inside the onclick HTML attribute,
-// and the apostrophe in "TULON'S" broke the attribute so the button silently did nothing.
-// Now the text is stored in a variable and the button just calls this with no arguments.
 async function shareReceipt() {
   if (!lastReceiptText) return;
   if (navigator.share) {
