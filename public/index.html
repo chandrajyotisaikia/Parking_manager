@@ -9,7 +9,6 @@
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/style.css?v=4">
 <style>
-  /* Glowing Button Styles */
   .glow-btn { transition: all 0.3s ease; }
   .glow-btn.paid-active { 
     background-color: #064e3b !important; 
@@ -79,10 +78,9 @@
       <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
       <div class="status" id="ocrStatus"></div>
 
-      <!-- triggers balance check when manually typing -->
-      <input type="text" id="plateInput" placeholder="e.g. AS01AB1234" autocapitalize="characters" onblur="checkBalance()">
+      <!-- UPGRADED: oninput makes the balance check instant while typing -->
+      <input type="text" id="plateInput" placeholder="e.g. AS01AB1234" autocapitalize="characters" oninput="checkBalance()">
       
-      <!-- Balance Warning Display -->
       <div id="balanceWarning"></div>
 
       <label>Vehicle Type</label>
@@ -92,7 +90,6 @@
       </div>
       <div id="chargePreview" class="status" style="margin-top:0;"></div>
 
-      <!-- Payment Status Buttons -->
       <label>Payment Status</label>
       <div class="type-row" style="margin-bottom: 16px;">
         <div class="type-btn glow-btn paid-active" id="btnPaid" onclick="selectPayment('PAID')">✅ PAID</div>
@@ -104,6 +101,7 @@
       <div id="resultBox"></div>
     </div>
 
+    <!-- UPGRADED EXIT PANEL -->
     <div class="card">
       <button class="secondary" style="width:100%; padding:16px; font-size:16px;" onclick="toggleExitPanel()">🚪 Mark Vehicle Exit</button>
       <div id="exitPanel" style="display:none; margin-top:16px;">
@@ -145,7 +143,7 @@
 
 <div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
 
-<script src="/gate.js?v=7"></script>
+<script src="/gate.js?v=8"></script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then(() => console.log('Service worker registered'));
