@@ -11,18 +11,19 @@ function selectType(type) {
   updateChargePreview();
 }
 
-// ---- New: Payment Status Toggle (Glowing Buttons) ----
 function selectPayment(status) {
   currentPaymentStatus = status;
   const btnPaid = document.getElementById('btnPaid');
   const btnUnpaid = document.getElementById('btnUnpaid');
   
-  if (status === 'PAID') {
-    btnPaid.classList.add('paid-active');
-    btnUnpaid.classList.remove('unpaid-active');
-  } else {
-    btnPaid.classList.remove('paid-active');
-    btnUnpaid.classList.add('unpaid-active');
+  if (btnPaid && btnUnpaid) {
+    if (status === 'PAID') {
+      btnPaid.classList.add('paid-active');
+      btnUnpaid.classList.remove('unpaid-active');
+    } else {
+      btnPaid.classList.remove('paid-active');
+      btnUnpaid.classList.add('unpaid-active');
+    }
   }
 }
 
@@ -32,19 +33,29 @@ function updateChargePreview() {
   if (el) el.textContent = `💰 Standard charge: ₹${amt} (free if subscriber)`;
 }
 
+// Crash-proof showTab logic
 function showTab(tab) {
-  document.getElementById('gateSection').style.display = tab === 'gate' ? 'block' : 'none';
-  document.getElementById('duesSection').style.display = tab === 'dues' ? 'block' : 'none';
-  document.getElementById('expenseSection').style.display = tab === 'expense' ? 'block' : 'none';
+  const gateSec = document.getElementById('gateSection');
+  const duesSec = document.getElementById('duesSection');
+  const expSec = document.getElementById('expenseSection');
   
-  document.getElementById('tabGate').classList.toggle('active', tab === 'gate');
-  document.getElementById('tabDues').classList.toggle('active', tab === 'dues');
-  document.getElementById('tabExpense').classList.toggle('active', tab === 'expense');
+  if (gateSec) gateSec.style.display = tab === 'gate' ? 'block' : 'none';
+  if (duesSec) duesSec.style.display = tab === 'dues' ? 'block' : 'none';
+  if (expSec) expSec.style.display = tab === 'expense' ? 'block' : 'none';
   
-  if (tab === 'dues') loadUnpaidVehicles();
+  const tabGate = document.getElementById('tabGate');
+  const tabDues = document.getElementById('tabDues');
+  const tabExp = document.getElementById('tabExpense');
+  
+  if (tabGate) tabGate.classList.toggle('active', tab === 'gate');
+  if (tabDues) tabDues.classList.toggle('active', tab === 'dues');
+  if (tabExp) tabExp.classList.toggle('active', tab === 'expense');
+  
+  if (tab === 'dues' && typeof loadUnpaidVehicles === 'function') {
+    loadUnpaidVehicles();
+  }
 }
 
-// ---- Attendant name lock ----
 function applyNameLockUI() {
   const locked = localStorage.getItem('attendantNameLocked') === 'true';
   const nameInput = document.getElementById('attendantName');
@@ -82,15 +93,11 @@ async function applyDisplaySettings() {
   }
 }
 
-// ---- New: Check Remaining Balance ----
 async function checkBalance() {
   const plate = document.getElementById('plateInput').value.trim();
   const warningBox = document.getElementById('balanceWarning');
   
-  if (!plate) {
-    warningBox.style.display = 'none';
-    return;
-  }
+  if (!plate || !warningBox) return;
 
   try {
     const res = await fetch(`/api/dues/${plate}`);
@@ -107,13 +114,14 @@ async function checkBalance() {
   }
 }
 
-// ---- Camera: Fast Cloud OCR ----
 function startScan() {
   const cameraInput = document.getElementById('cameraInput');
-  cameraInput.style.display = 'block';
-  cameraInput.style.position = 'absolute';
-  cameraInput.style.left = '-9999px';
-  cameraInput.click();
+  if (cameraInput) {
+    cameraInput.style.display = 'block';
+    cameraInput.style.position = 'absolute';
+    cameraInput.style.left = '-9999px';
+    cameraInput.click();
+  }
 }
 
 document.getElementById('cameraInput').addEventListener('change', async (e) => {
@@ -121,7 +129,7 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   if (!file) return;
 
   const statusEl = document.getElementById('ocrStatus');
-  statusEl.textContent = '⚙️ Optimizing photo...';
+  if (statusEl) statusEl.textContent = '⚙️ Optimizing photo...';
 
   try {
     const reader = new FileReader();
@@ -148,7 +156,7 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
         ctx.drawImage(img, 0, 0, width, height);
         
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-        statusEl.textContent = '☁️ Reading plate number...';
+        if (statusEl) statusEl.textContent = '☁️ Reading plate number...';
 
         const formData = new FormData();
         formData.append('base64Image', compressedBase64);
@@ -165,7 +173,7 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
           const data = await response.json();
 
           if (data.IsErroredOnProcessing || !data.ParsedResults || data.ParsedResults.length === 0) {
-            statusEl.textContent = "⚠️ Couldn't read the plate clearly. Please type it.";
+            if (statusEl) statusEl.textContent = "⚠️ Couldn't read the plate clearly. Please type it.";
             return;
           }
 
@@ -173,32 +181,30 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
           const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
           if (!cleaned) {
-            statusEl.textContent = "⚠️ No letters/numbers found. Please type it.";
+            if (statusEl) statusEl.textContent = "⚠️ No letters/numbers found. Please type it.";
             return;
           }
 
           document.getElementById('plateInput').value = cleaned;
-          statusEl.textContent = `✅ Recognized: "${cleaned}"`;
+          if (statusEl) statusEl.textContent = `✅ Recognized: "${cleaned}"`;
           
-          // New: Automatically check balance after OCR succeeds
           checkBalance();
           
         } catch (apiErr) {
           console.error('API Error:', apiErr);
-          statusEl.textContent = "⚠️ Connection error. Please type the plate.";
+          if (statusEl) statusEl.textContent = "⚠️ Connection error. Please type the plate.";
         }
       };
       img.src = event.target.result;
     };
   } catch (err) {
-    statusEl.textContent = "⚠️ Camera failed. Please type manually.";
+    if (statusEl) statusEl.textContent = "⚠️ Camera failed. Please type manually.";
   } finally {
     e.target.value = ''; 
     e.target.style.display = 'none'; 
   }
 });
 
-// ---- Check-in submit ----
 let lastReceiptText = '';
 
 async function checkIn() {
@@ -208,7 +214,7 @@ async function checkIn() {
   const warningBox = document.getElementById('balanceWarning');
   
   if (!plate) {
-    resultBox.innerHTML = `<div class="result paid">Please enter or scan a plate number first.</div>`;
+    if (resultBox) resultBox.innerHTML = `<div class="result paid">Please enter or scan a plate number first.</div>`;
     return;
   }
   
@@ -216,7 +222,6 @@ async function checkIn() {
     const res = await fetch('/api/verify-and-log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // New: Sending paymentStatus to the server
       body: JSON.stringify({ vehicleNumber: plate, vehicleType: selectedType, attendantName, paymentStatus: currentPaymentStatus }),
     });
     
@@ -228,21 +233,23 @@ async function checkIn() {
     
     lastReceiptText = `TULON'S PARKING\nVehicle: ${data.vehicleNumber} (${data.vehicleType})\n${data.isSubscriber ? `Subscriber: ${data.subscriberName} - Free entry` : `Charge: Rs ${data.amount} ${statusText}`}\nAttendant: ${attendantName || 'N/A'}\nTime: ${new Date(data.entryTime).toLocaleString('en-IN')}`;
 
-    resultBox.innerHTML = `<div class="result ${cls}">
-      ${data.vehicleNumber} — ${data.isSubscriber ? `Subscriber (${data.subscriberName}) — Free entry` : `Charge: ₹${data.amount} <br><strong style="color:${currentPaymentStatus==='UNPAID'?'#ef4444':'#10b981'}">${statusText}</strong>`}
-      <div style="margin-top:12px;">
-        <button class="secondary" onclick="shareReceipt()">📤 Share Receipt</button>
-      </div>
-    </div>`;
+    if (resultBox) {
+      resultBox.innerHTML = `<div class="result ${cls}">
+        ${data.vehicleNumber} — ${data.isSubscriber ? `Subscriber (${data.subscriberName}) — Free entry` : `Charge: ₹${data.amount} <br><strong style="color:${currentPaymentStatus==='UNPAID'?'#ef4444':'#10b981'}">${statusText}</strong>`}
+        <div style="margin-top:12px;">
+          <button class="secondary" onclick="shareReceipt()">📤 Share Receipt</button>
+        </div>
+      </div>`;
+    }
     
-    // Reset form
     document.getElementById('plateInput').value = '';
-    document.getElementById('ocrStatus').textContent = '';
-    warningBox.style.display = 'none';
-    selectPayment('PAID'); // Reset back to Paid default
+    const statusEl = document.getElementById('ocrStatus');
+    if (statusEl) statusEl.textContent = '';
+    if (warningBox) warningBox.style.display = 'none';
+    selectPayment('PAID'); 
     
   } catch (err) {
-    resultBox.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
+    if (resultBox) resultBox.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
   }
 }
 
@@ -256,34 +263,40 @@ async function shareReceipt() {
   catch (err) { alert(lastReceiptText); }
 }
 
-// ---- Mark vehicle exit ----
 let exitPanelOpen = false;
 async function toggleExitPanel() {
   exitPanelOpen = !exitPanelOpen;
   const panel = document.getElementById('exitPanel');
-  panel.style.display = exitPanelOpen ? 'block' : 'none';
+  if (panel) panel.style.display = exitPanelOpen ? 'block' : 'none';
   if (exitPanelOpen) await loadActiveVehicles();
 }
 
 async function loadActiveVehicles() {
   const statusEl = document.getElementById('exitStatus');
   const listEl = document.getElementById('exitList');
-  statusEl.textContent = 'Loading parked vehicles...';
-  listEl.innerHTML = '';
+  if (statusEl) statusEl.textContent = 'Loading parked vehicles...';
+  if (listEl) listEl.innerHTML = '';
   
   try {
     const res = await fetch('/api/entries/active');
     const data = await res.json();
-    if (!data.entries || data.entries.length === 0) { statusEl.textContent = 'No vehicles currently parked.'; return; }
+    if (!data.entries || data.entries.length === 0) { 
+      if (statusEl) statusEl.textContent = 'No vehicles currently parked.'; 
+      return; 
+    }
     
-    statusEl.textContent = `${data.entries.length} vehicle(s) currently parked. Tap one to check out:`;
-    listEl.innerHTML = data.entries.map(e => `
-      <div class="type-btn" style="text-align:left; margin-bottom:8px; border-color:${e.payment_status === 'UNPAID' ? '#ef4444' : '#555'}" onclick="confirmExit(${e.id}, '${e.vehicle_number}')">
-        ${e.vehicle_number} — ${e.vehicle_type} 
-        ${e.payment_status === 'UNPAID' ? '<span style="color:#ef4444; float:right;">(UNPAID)</span>' : ''}
-      </div>
-    `).join('');
-  } catch (err) { statusEl.textContent = 'Could not load parked vehicles — try again.'; }
+    if (statusEl) statusEl.textContent = `${data.entries.length} vehicle(s) currently parked. Tap one to check out:`;
+    if (listEl) {
+      listEl.innerHTML = data.entries.map(e => `
+        <div class="type-btn" style="text-align:left; margin-bottom:8px; border-color:${e.payment_status === 'UNPAID' ? '#ef4444' : '#555'}" onclick="confirmExit(${e.id}, '${e.vehicle_number}')">
+          ${e.vehicle_number} — ${e.vehicle_type} 
+          ${e.payment_status === 'UNPAID' ? '<span style="color:#ef4444; float:right;">(UNPAID)</span>' : ''}
+        </div>
+      `).join('');
+    }
+  } catch (err) { 
+    if (statusEl) statusEl.textContent = 'Could not load parked vehicles — try again.'; 
+  }
 }
 
 async function confirmExit(entryId, plate) {
@@ -293,42 +306,45 @@ async function confirmExit(entryId, plate) {
     const res = await fetch(`/api/entries/${entryId}/exit`, { method: 'POST' });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
-    statusEl.textContent = `✅ ${plate} checked out.`;
+    if (statusEl) statusEl.textContent = `✅ ${plate} checked out.`;
     await loadActiveVehicles();
-  } catch (err) { statusEl.textContent = `Error: ${err.message}`; }
+  } catch (err) { 
+    if (statusEl) statusEl.textContent = `Error: ${err.message}`; 
+  }
 }
 
-// ---- New: Pending Dues Management ----
 async function loadUnpaidVehicles() {
   const statusEl = document.getElementById('duesStatus');
   const listEl = document.getElementById('duesList');
-  statusEl.textContent = 'Loading unpaid entries...';
-  listEl.innerHTML = '';
+  if (statusEl) statusEl.textContent = 'Loading unpaid entries...';
+  if (listEl) listEl.innerHTML = '';
   
   try {
     const res = await fetch('/api/dues/unpaid');
     const data = await res.json();
     
     if (!data.entries || data.entries.length === 0) {
-      statusEl.textContent = '✅ All vehicles have paid. No pending dues.';
+      if (statusEl) statusEl.textContent = '✅ All vehicles have paid. No pending dues.';
       return;
     }
     
-    statusEl.textContent = `${data.entries.length} unpaid entry(s). Tap 'Mark Paid' to clear them:`;
-    listEl.innerHTML = data.entries.map(e => `
-      <div class="card" style="margin-bottom:8px; padding:12px; border-color:#ef4444;">
-        <div style="font-size:18px; font-weight:bold; color:#F5C518;">${e.vehicle_number}</div>
-        <div style="color:#aaa; font-size:14px; margin-bottom:10px;">Date: ${new Date(e.entry_time).toLocaleString('en-IN')} <br> Amount Due: ₹${e.amount_charged}</div>
-        <button class="primary" style="background:#10b981; padding:10px; width:100%;" onclick="settleDues(${e.id}, '${e.vehicle_number}')">💰 Mark as Paid</button>
-      </div>
-    `).join('');
+    if (statusEl) statusEl.textContent = `${data.entries.length} unpaid entry(s). Tap 'Mark Paid' to clear them:`;
+    if (listEl) {
+      listEl.innerHTML = data.entries.map(e => `
+        <div class="card" style="margin-bottom:8px; padding:12px; border-color:#ef4444;">
+          <div style="font-size:18px; font-weight:bold; color:#F5C518;">${e.vehicle_number}</div>
+          <div style="color:#aaa; font-size:14px; margin-bottom:10px;">Date: ${new Date(e.entry_time).toLocaleString('en-IN')} <br> Amount Due: ₹${e.amount_charged}</div>
+          <button class="primary" style="background:#10b981; padding:10px; width:100%;" onclick="settleDues(${e.id}, '${e.vehicle_number}')">💰 Mark as Paid</button>
+        </div>
+      `).join('');
+    }
   } catch (err) {
-    statusEl.textContent = 'Could not load unpaid vehicles.';
+    if (statusEl) statusEl.textContent = 'Could not load unpaid vehicles.';
   }
 }
 
 async function settleDues(entryId, plate) {
-  if (!confirm(`Mark ₹ dues as PAID for ${plate}?`)) return;
+  if (!confirm(`Mark dues as PAID for ${plate}?`)) return;
   
   try {
     const res = await fetch(`/api/entries/${entryId}/pay`, { method: 'POST' });
@@ -336,13 +352,12 @@ async function settleDues(entryId, plate) {
     if (!data.success) throw new Error(data.error || 'Unknown error');
     
     alert(`Successfully marked ${plate} as PAID.`);
-    loadUnpaidVehicles(); // Refresh the list
+    loadUnpaidVehicles(); 
   } catch (err) {
     alert(`Error: ${err.message}`);
   }
 }
 
-// ---- Expense logging ----
 async function submitExpense() {
   const amount = document.getElementById('expAmount').value;
   const description = document.getElementById('expDesc').value.trim();
@@ -351,7 +366,7 @@ async function submitExpense() {
   const resultEl = document.getElementById('expenseResult');
 
   if (!amount || !description || !expenseDate) {
-    resultEl.innerHTML = `<div class="result paid">Please fill in amount, description, and date.</div>`;
+    if (resultEl) resultEl.innerHTML = `<div class="result paid">Please fill in amount, description, and date.</div>`;
     return;
   }
   
@@ -365,10 +380,11 @@ async function submitExpense() {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
     
-    resultEl.innerHTML = `<div class="result sub">Expense logged: ₹${amount} — ${description}</div>`;
+    if (resultEl) resultEl.innerHTML = `<div class="result sub">Expense logged: ₹${amount} — ${description}</div>`;
     document.getElementById('expAmount').value = '';
     document.getElementById('expDesc').value = '';
   } catch (err) {
-    resultEl.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
+    if (resultEl) resultEl.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
   }
-}
+                                                                         }
+          
