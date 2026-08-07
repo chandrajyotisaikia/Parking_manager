@@ -35,6 +35,8 @@
     <input type="text" id="attendantName" placeholder="Your name">
   </div>
 
+  <button class="scan" id="installBtn" style="display:none; background:#3B82F6; color:#fff;" onclick="installApp()">📲 Install App on This Device</button>
+
   <!-- GATE ENTRY -->
   <div id="gateSection">
     <div class="card">
@@ -54,6 +56,14 @@
       <button class="primary" onclick="checkIn()">✓ Check In Vehicle</button>
 
       <div id="resultBox"></div>
+    </div>
+
+    <div class="card">
+      <button class="secondary" style="width:100%; padding:16px; font-size:16px;" onclick="toggleExitPanel()">🚪 Mark Vehicle Exit</button>
+      <div id="exitPanel" style="display:none; margin-top:16px;">
+        <div class="status" id="exitStatus">Loading parked vehicles...</div>
+        <div id="exitList"></div>
+      </div>
     </div>
   </div>
 
@@ -83,11 +93,29 @@ if ('serviceWorker' in navigator) {
 }
 document.getElementById('expDate').valueAsDate = new Date();
 
-// Remember the attendant's name between visits
+// Remember the attendant's name on this device/browser permanently (localStorage survives closing the app)
 const savedName = localStorage.getItem('attendantName');
 if (savedName) document.getElementById('attendantName').value = savedName;
-document.getElementById('attendantName').addEventListener('change', (e) => {
-  localStorage.setItem('attendantName', e.target.value);
+document.getElementById('attendantName').addEventListener('input', (e) => {
+  localStorage.setItem('attendantName', e.target.value.trim());
+});
+
+// Install prompt — Chrome fires this when the PWA is installable; we capture it to show our own button
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('installBtn').style.display = 'block';
+});
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('installBtn').style.display = 'none';
+}
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBtn').style.display = 'none';
 });
 
 // Device-aware default: on a wide (desktop-sized) screen, send the user to the CRM dashboard instead.
