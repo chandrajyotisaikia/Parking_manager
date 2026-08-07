@@ -1,4 +1,5 @@
-// gate.js — handles the gate check-in screen: manual entry, camera OCR scan, receipts, and expense logging
+// gate.js — gate check-in screen: manual entry, camera OCR + AI vehicle-type detection,
+// name locking, live charge preview, receipts, vehicle exit, expense logging, display settings.
 
 let selectedType = 'CAR';
 
@@ -6,6 +7,14 @@ function selectType(type) {
   selectedType = type;
   document.getElementById('btnCar').classList.toggle('selected', type === 'CAR');
   document.getElementById('btnBike').classList.toggle('selected', type === 'BIKE');
+  updateChargePreview();
+}
+
+// Upgrade: tells the attendant what to charge before they even tap Check In
+function updateChargePreview() {
+  const amt = selectedType === 'CAR' ? 80 : 40;
+  const el = document.getElementById('chargePreview');
+  if (el) el.textContent = `💰 Standard charge: ₹${amt} (free if subscriber — confirmed after Check In)`;
 }
 
 function showTab(tab) {
@@ -15,7 +24,64 @@ function showTab(tab) {
   document.getElementById('tabExpense').classList.toggle('active', tab === 'expense');
 }
 
-// ---- Camera OCR scanning ----
+// ---- Attendant name lock ----
+// Once confirmed, the field locks. Editing after that requires the admin password,
+// so a name can't be casually changed mid-shift by mistake.
+function applyNameLockUI() {
+  const locked = localStorage.getItem('attendantNameLocked') === 'true';
+  const nameInput = document.getElementById('attendantName');
+  const confirmBtn = document.getElementById('confirmNameBtn');
+  const lockedRow = document.getElementById('nameLockedRow');
+  nameInput.disabled = locked;
+  confirmBtn.style.display = locked ? 'none' : 'block';
+  lockedRow.style.display = locked ? 'block' : 'none';
+  if (locked) document.getElementById('lockedNameDisplay').textContent = nameInput.value;
+}
+
+function confirmName() {
+  const name = document.getElementById('attendantName').value.trim();
+  if (!name) { alert('Please enter a name first.'); return; }
+  localStorage.setItem('attendantName', name);
+  localStorage.setItem('attendantNameLocked', 'true');
+  applyNameLockUI();
+}
+
+function unlockName() {
+  const pwd = prompt('Enter admin password to edit the attendant name:');
+  if (pwd === null) return;
+  if (pwd === 'LoginPwd') {
+    localStorage.setItem('attendantNameLocked', 'false');
+    applyNameLockUI();
+  } else {
+    alert('Incorrect password.');
+  }
+}
+
+// ---- Display settings (set from the admin dashboard) ----
+async function applyDisplaySettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    const s = data.settings || {};
+    const padMap = { normal: '18px 16px', large: '22px 18px', xl: '28px 22px' };
+    const fontMap = { normal: '18px', large: '20px', xl: '24px' };
+    document.documentElement.style.setProperty('--btn-pad', padMap[s.button_size] || padMap.normal);
+    document.documentElement.style.setProperty('--btn-font', fontMap[s.button_size] || fontMap.normal);
+    document.body.classList.toggle('minimal', s.minimal_mode === 'true');
+  } catch (err) {
+    console.warn('[settings] using defaults:', err.message);
+  }
+}
+
+// ---- Camera: OCR plate reading + free on-device AI vehicle-type detection ----
+// coco-ssd is a free, client-side object detection model (no API key, no account) —
+// it can recognize "car" vs "motorcycle" in the photo, so the type can be auto-filled.
+let cocoModel = null;
+async function getCocoModel() {
+  if (!cocoModel) cocoModel = await cocoSsd.load();
+  return cocoModel;
+}
+
 function startScan() {
   document.getElementById('cameraInput').click();
 }
@@ -25,28 +91,49 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   if (!file) return;
 
   const statusEl = document.getElementById('ocrStatus');
-  statusEl.textContent = '📷 Photo captured. Loading OCR engine...';
+  statusEl.textContent = '📷 Photo captured. Analyzing...';
 
   try {
     const imageBitmap = await createImageBitmap(file);
-    const canvas = document.createElement('canvas');
-    canvas.width = imageBitmap.width;
-    canvas.height = imageBitmap.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imageBitmap, 0, 0);
 
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // Original color canvas — used for AI vehicle-type detection
+    const colorCanvas = document.createElement('canvas');
+    colorCanvas.width = imageBitmap.width;
+    colorCanvas.height = imageBitmap.height;
+    colorCanvas.getContext('2d').drawImage(imageBitmap, 0, 0);
+
+    // Best-effort vehicle type detection — never blocks the OCR flow if it fails
+    try {
+      statusEl.textContent = '🚙 Detecting vehicle type...';
+      const model = await getCocoModel();
+      const predictions = await model.detect(colorCanvas);
+      const vehiclePred = predictions
+        .filter(p => ['car', 'motorcycle', 'truck', 'bus'].includes(p.class))
+        .sort((a, b) => b.score - a.score)[0];
+      if (vehiclePred) {
+        const detectedType = vehiclePred.class === 'motorcycle' ? 'BIKE' : 'CAR';
+        selectType(detectedType);
+        statusEl.textContent = `🚙 Detected: ${detectedType === 'BIKE' ? 'Bike' : 'Car'} (${Math.round(vehiclePred.score * 100)}% confidence). `;
+      }
+    } catch (visionErr) {
+      console.warn('[vehicle detection]', visionErr);
+    }
+
+    // Preprocess for OCR: grayscale + auto-brightness threshold
+    const ocrCanvas = document.createElement('canvas');
+    ocrCanvas.width = imageBitmap.width;
+    ocrCanvas.height = imageBitmap.height;
+    const ctx = ocrCanvas.getContext('2d');
+    ctx.drawImage(imageBitmap, 0, 0);
+    const imgData = ctx.getImageData(0, 0, ocrCanvas.width, ocrCanvas.height);
     const data = imgData.data;
 
-    // Upgrade: auto-brightness — compute the image's average brightness first,
-    // then set the black/white threshold relative to it instead of a fixed number.
-    // This keeps OCR working in both bright sun and shadow instead of only one lighting condition.
     let totalLuminance = 0;
     for (let i = 0; i < data.length; i += 4) {
       totalLuminance += 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
     }
     const avgLuminance = totalLuminance / (data.length / 4);
-    const threshold = avgLuminance * 0.85; // slightly below average separates text from background
+    const threshold = avgLuminance * 0.85;
 
     for (let i = 0; i < data.length; i += 4) {
       const gray = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
@@ -55,9 +142,9 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
     }
     ctx.putImageData(imgData, 0, 0);
 
-    statusEl.textContent = '🔍 Reading plate text (first scan can take ~30s to load model)...';
+    statusEl.textContent += ' 🔍 Reading plate text (first scan can take ~30s to load)...';
 
-    const result = await Tesseract.recognize(canvas, 'eng', {
+    const result = await Tesseract.recognize(ocrCanvas, 'eng', {
       logger: (m) => {
         if (m.status === 'recognizing text') {
           statusEl.textContent = `🔍 Reading plate... ${Math.round(m.progress * 100)}%`;
@@ -76,7 +163,7 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
     document.getElementById('plateInput').value = cleaned;
     statusEl.textContent = `✅ Recognized: "${cleaned}" — please check it's correct before confirming.`;
   } catch (err) {
-    console.error('[OCR error]', err);
+    console.error('[scan error]', err);
     statusEl.textContent = "⚠️ Scan failed — try again or type the plate manually below.";
   } finally {
     e.target.value = '';
@@ -84,6 +171,8 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
 });
 
 // ---- Check-in submit ----
+let lastReceiptText = '';
+
 async function checkIn() {
   const plate = document.getElementById('plateInput').value.trim();
   const attendantName = document.getElementById('attendantName').value.trim();
@@ -102,12 +191,12 @@ async function checkIn() {
     if (!data.success) throw new Error(data.error || 'Unknown error');
 
     const cls = data.isSubscriber ? 'sub' : 'paid';
-    const receiptText = `TULON'S PARKING\nVehicle: ${data.vehicleNumber} (${data.vehicleType})\n${data.isSubscriber ? `Subscriber: ${data.subscriberName} — Free entry` : `Charge: ₹${data.amount}`}\nAttendant: ${attendantName || 'N/A'}\nTime: ${new Date(data.entryTime).toLocaleString('en-IN')}`;
+    lastReceiptText = `TULON'S PARKING\nVehicle: ${data.vehicleNumber} (${data.vehicleType})\n${data.isSubscriber ? `Subscriber: ${data.subscriberName} - Free entry` : `Charge: Rs ${data.amount}`}\nAttendant: ${attendantName || 'N/A'}\nTime: ${new Date(data.entryTime).toLocaleString('en-IN')}`;
 
     resultBox.innerHTML = `<div class="result ${cls}">
       ${data.vehicleNumber} — ${data.isSubscriber ? `Subscriber (${data.subscriberName}) — Free entry` : `Charge: ₹${data.amount}`}
       <div style="margin-top:12px;">
-        <button class="secondary" onclick='shareReceipt(${JSON.stringify(receiptText)})'>📤 Share Receipt</button>
+        <button class="secondary" onclick="shareReceipt()">📤 Share Receipt</button>
       </div>
     </div>`;
     document.getElementById('plateInput').value = '';
@@ -117,23 +206,24 @@ async function checkIn() {
   }
 }
 
-// Upgrade: shareable receipt — uses the phone's native share sheet if available (WhatsApp, SMS, etc.),
-// falls back to copying the text so it can be pasted anywhere. No paid SMS service needed.
-async function shareReceipt(text) {
+// Fix: previously this built the share text inline inside the onclick HTML attribute,
+// and the apostrophe in "TULON'S" broke the attribute so the button silently did nothing.
+// Now the text is stored in a variable and the button just calls this with no arguments.
+async function shareReceipt() {
+  if (!lastReceiptText) return;
   if (navigator.share) {
     try {
-      await navigator.share({ title: "Tulon's Parking Receipt", text });
+      await navigator.share({ title: "Tulon's Parking Receipt", text: lastReceiptText });
       return;
     } catch (err) {
-      // user cancelled the share sheet — no error needed
-      return;
+      return; // user cancelled the share sheet
     }
   }
   try {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(lastReceiptText);
     alert('Receipt copied — you can paste it into a message.');
   } catch (err) {
-    alert(text); // last-resort fallback so the info is never lost
+    alert(lastReceiptText);
   }
 }
 

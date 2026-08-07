@@ -21,8 +21,8 @@ if (sessionStorage.getItem('adminLoggedIn') === 'true') {
 }
 
 function showAdminTab(tab) {
-  const panels = { entries: 'entriesPanel', subs: 'subsPanel', addsub: 'addsubPanel', expenses: 'expensesPanel', export: 'exportPanel' };
-  const tabs = { entries: 'tabEntries', subs: 'tabSubs', addsub: 'tabAddSub', expenses: 'tabExpenses', export: 'tabExport' };
+  const panels = { entries: 'entriesPanel', subs: 'subsPanel', addsub: 'addsubPanel', expenses: 'expensesPanel', export: 'exportPanel', display: 'displayPanel' };
+  const tabs = { entries: 'tabEntries', subs: 'tabSubs', addsub: 'tabAddSub', expenses: 'tabExpenses', export: 'tabExport', display: 'tabDisplay' };
   Object.keys(panels).forEach(key => {
     document.getElementById(panels[key]).style.display = key === tab ? 'block' : 'none';
     document.getElementById(tabs[key]).classList.toggle('active', key === tab);
@@ -132,4 +132,30 @@ function downloadReport() {
   }
   resultEl.innerHTML = '';
   window.location.href = `/api/export?startDate=${start}&endDate=${end}`;
+}
+
+// ---- Display settings (button size + minimal mode on the gate app) ----
+async function loadDisplaySettings() {
+  const res = await fetch('/api/settings');
+  const data = await res.json();
+  document.getElementById('settingButtonSize').value = data.settings.button_size || 'normal';
+  document.getElementById('settingMinimal').checked = data.settings.minimal_mode === 'true';
+}
+
+async function saveDisplaySettings() {
+  const button_size = document.getElementById('settingButtonSize').value;
+  const minimal_mode = document.getElementById('settingMinimal').checked ? 'true' : 'false';
+  const resultEl = document.getElementById('settingsResult');
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ button_size, minimal_mode }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error('Failed to save');
+    resultEl.innerHTML = `<div class="result sub">Saved.</div>`;
+  } catch (err) {
+    resultEl.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
+  }
 }

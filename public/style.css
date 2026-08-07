@@ -1,5 +1,6 @@
 /* style.css — High-contrast outdoor theme: black background, yellow accents, big touch targets */
 * { box-sizing: border-box; }
+:root { --btn-pad: 18px 16px; --btn-font: 18px; }
 body {
   margin: 0;
   font-family: -apple-system, Roboto, Arial, sans-serif;
@@ -41,16 +42,17 @@ input, select {
 input:focus { border-color: #F5C518; outline: none; }
 .type-row { display: flex; gap: 12px; margin-bottom: 16px; }
 .type-btn {
-  flex: 1; padding: 20px; text-align: center; border-radius: 10px;
+  flex: 1; padding: var(--btn-pad); text-align: center; border-radius: 10px;
   border: 2px solid #444; background: #000; color: #fff; font-weight: 700; cursor: pointer;
+  font-size: var(--btn-font);
 }
 .type-btn.selected { background: #F5C518; color: #000; border-color: #F5C518; }
 button.primary {
-  width: 100%; padding: 18px; font-size: 18px; font-weight: 800;
+  width: 100%; padding: var(--btn-pad); font-size: var(--btn-font); font-weight: 800;
   background: #16A34A; color: #fff; border: none; border-radius: 10px; cursor: pointer;
 }
 button.scan {
-  width: 100%; padding: 18px; font-size: 16px; font-weight: 800;
+  width: 100%; padding: var(--btn-pad); font-size: var(--btn-font); font-weight: 800;
   background: #F5C518; color: #000; border: none; border-radius: 10px; cursor: pointer; margin-bottom: 16px;
 }
 button.secondary {
@@ -73,3 +75,10 @@ th, td { text-align: left; padding: 10px; border-bottom: 1px solid #333; }
 .income { color: #16A34A; }
 .expense { color: #ef4444; }
 .net { color: #F5C518; }
+
+/* Minimal mode — toggled from the admin dashboard's Display Settings tab */
+body.minimal .card { box-shadow: none; border-color: #1a1a1a; background: #0f0f0f; }
+body.minimal .type-btn.selected { background: #222; color: #F5C518; border-color: #F5C518; }
+body.minimal button.scan { background: #111; color: #F5C518; border: 2px solid #F5C518; }
+body.minimal button.primary { background: #111; color: #16A34A; border: 2px solid #16A34A; }
+body.minimal .header { border-bottom: 1px solid #222; }

@@ -78,6 +78,7 @@
     <div class="tab" id="tabAddSub" onclick="showAdminTab('addsub')">Add Subscriber</div>
     <div class="tab" id="tabExpenses" onclick="showAdminTab('expenses')">Expenses</div>
     <div class="tab" id="tabExport" onclick="showAdminTab('export')">Download Data</div>
+    <div class="tab" id="tabDisplay" onclick="showAdminTab('display'); loadDisplaySettings();">Display Settings</div>
   </div>
 
   <div id="entriesPanel" class="card">
@@ -116,10 +117,25 @@
     <div id="exportResult"></div>
   </div>
 
+  <div id="displayPanel" class="card" style="display:none">
+    <label>Gate App Button Size</label>
+    <select id="settingButtonSize">
+      <option value="normal">Normal</option>
+      <option value="large">Large</option>
+      <option value="xl">Extra Large</option>
+    </select>
+    <label style="margin-top:16px; display:flex; align-items:center; gap:8px; text-transform:none;">
+      <input type="checkbox" id="settingMinimal" style="width:auto; margin:0;"> Minimalistic Design (gate app)
+    </label>
+    <button class="primary" onclick="saveDisplaySettings()" style="margin-top:16px;">Save Settings</button>
+    <div id="settingsResult"></div>
+    <div style="font-size:13px; color:#94A3B8; margin-top:12px;">Changes apply the next time the gate app is opened or refreshed on the attendant's phone.</div>
+  </div>
+
 </div>
 
 <div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
 
-<script src="/admin.js"></script>
+<script src="/admin.js?v=4"></script>
 </body>
 </html>

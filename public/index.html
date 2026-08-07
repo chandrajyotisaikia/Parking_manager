@@ -7,7 +7,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#F5C518">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=4">
 </head>
 <body>
 
@@ -33,6 +33,10 @@
   <div class="card">
     <label>Attendant Name</label>
     <input type="text" id="attendantName" placeholder="Your name">
+    <button class="secondary" id="confirmNameBtn" style="margin-top:10px;" onclick="confirmName()">Confirm Name</button>
+    <div id="nameLockedRow" style="display:none; margin-top:10px; font-size:13px; color:#aaa;">
+      Locked as <strong id="lockedNameDisplay"></strong>. <a href="#" onclick="unlockName(); return false;" style="color:#F5C518;">Edit</a>
+    </div>
   </div>
 
   <button class="scan" id="installBtn" style="display:none; background:#3B82F6; color:#fff;" onclick="installApp()">📲 Install App on This Device</button>
@@ -49,9 +53,10 @@
 
       <label>Vehicle Type</label>
       <div class="type-row">
-        <div class="type-btn selected" id="btnCar" onclick="selectType('CAR')">🚗 Car (₹80)</div>
-        <div class="type-btn" id="btnBike" onclick="selectType('BIKE')">🏍️ Bike (₹40)</div>
+        <div class="type-btn selected" id="btnCar" onclick="selectType('CAR')">🚗 Car</div>
+        <div class="type-btn" id="btnBike" onclick="selectType('BIKE')">🏍️ Bike</div>
       </div>
+      <div id="chargePreview" class="status" style="margin-top:0;"></div>
 
       <button class="primary" onclick="checkIn()">✓ Check In Vehicle</button>
 
@@ -86,21 +91,26 @@
 <div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="/gate.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="/gate.js?v=4"></script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then(() => console.log('Service worker registered'));
 }
 document.getElementById('expDate').valueAsDate = new Date();
 
-// Remember the attendant's name on this device/browser permanently (localStorage survives closing the app)
 const savedName = localStorage.getItem('attendantName');
 if (savedName) document.getElementById('attendantName').value = savedName;
 document.getElementById('attendantName').addEventListener('input', (e) => {
-  localStorage.setItem('attendantName', e.target.value.trim());
+  if (localStorage.getItem('attendantNameLocked') !== 'true') {
+    localStorage.setItem('attendantName', e.target.value.trim());
+  }
 });
+applyNameLockUI();
+updateChargePreview();
+applyDisplaySettings();
 
-// Install prompt — Chrome fires this when the PWA is installable; we capture it to show our own button
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -118,7 +128,6 @@ window.addEventListener('appinstalled', () => {
   document.getElementById('installBtn').style.display = 'none';
 });
 
-// Device-aware default: on a wide (desktop-sized) screen, send the user to the CRM dashboard instead.
 if (window.innerWidth > 900 && !sessionStorage.getItem('skipDesktopRedirect')) {
   window.location.href = '/admin.html';
 }
