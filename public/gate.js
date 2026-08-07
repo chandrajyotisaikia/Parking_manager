@@ -137,6 +137,53 @@ async function shareReceipt(text) {
   }
 }
 
+// ---- Mark vehicle exit ----
+let exitPanelOpen = false;
+
+async function toggleExitPanel() {
+  exitPanelOpen = !exitPanelOpen;
+  const panel = document.getElementById('exitPanel');
+  panel.style.display = exitPanelOpen ? 'block' : 'none';
+  if (exitPanelOpen) await loadActiveVehicles();
+}
+
+async function loadActiveVehicles() {
+  const statusEl = document.getElementById('exitStatus');
+  const listEl = document.getElementById('exitList');
+  statusEl.textContent = 'Loading parked vehicles...';
+  listEl.innerHTML = '';
+  try {
+    const res = await fetch('/api/entries/active');
+    const data = await res.json();
+    if (!data.entries || data.entries.length === 0) {
+      statusEl.textContent = 'No vehicles currently parked.';
+      return;
+    }
+    statusEl.textContent = `${data.entries.length} vehicle(s) currently parked. Tap one to check out:`;
+    listEl.innerHTML = data.entries.map(e => `
+      <div class="type-btn" style="text-align:left; margin-bottom:8px;" onclick="confirmExit(${e.id}, '${e.vehicle_number}')">
+        ${e.vehicle_number} — ${e.vehicle_type} — entered ${new Date(e.entry_time).toLocaleTimeString('en-IN')}
+      </div>
+    `).join('');
+  } catch (err) {
+    statusEl.textContent = 'Could not load parked vehicles — try again.';
+  }
+}
+
+async function confirmExit(entryId, plate) {
+  if (!confirm(`Confirm exit for ${plate}?`)) return;
+  const statusEl = document.getElementById('exitStatus');
+  try {
+    const res = await fetch(`/api/entries/${entryId}/exit`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Unknown error');
+    statusEl.textContent = `✅ ${plate} checked out.`;
+    await loadActiveVehicles();
+  } catch (err) {
+    statusEl.textContent = `Error: ${err.message}`;
+  }
+}
+
 // ---- Expense logging ----
 async function submitExpense() {
   const amount = document.getElementById('expAmount').value;

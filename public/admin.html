@@ -9,6 +9,35 @@
   body { max-width: 900px; margin: 0 auto; }
   .container { max-width: 900px; }
   #loginScreen { max-width: 360px; margin: 80px auto; }
+
+  /* Professional CRM look — only applies on desktop-sized screens.
+     Below 900px width, the page falls back to the normal high-contrast theme from style.css. */
+  @media (min-width: 900px) {
+    body { max-width: none; background: #F4F6F9; color: #1E2733; font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+    .header { background: #fff; border-bottom: 1px solid #E2E8F0; padding: 20px 32px; }
+    .logo { color: #1E2733; }
+    .brand-sub { color: #2563EB; }
+    .tag { color: #64748B; }
+    .container { max-width: 1100px; padding: 32px; }
+    .summary-row { gap: 20px; }
+    .summary-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .summary-card .label { color: #64748B; }
+    .income { color: #16A34A; } .expense { color: #DC2626; } .net { color: #2563EB; }
+
+    .tabs { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 6px; gap: 4px; }
+    .tab { background: transparent; color: #475569; border-radius: 8px; font-weight: 600; }
+    .tab.active { background: #2563EB; color: #fff; }
+
+    .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); color: #1E2733; }
+    label { color: #475569; }
+    input, select { background: #F8FAFC; border: 1px solid #CBD5E1; color: #1E2733; }
+    input:focus { border-color: #2563EB; }
+    button.primary { background: #2563EB; }
+    th { color: #64748B; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #E2E8F0; }
+    td { border-bottom: 1px solid #F1F5F9; }
+    .expired { color: #DC2626; }
+    .footer { color: #94A3B8; border-top: 1px solid #E2E8F0; }
+  }
 </style>
 </head>
 <body>
