@@ -156,8 +156,35 @@ async function exportReport(req, res) {
   return res.send(csv);
 }
 
+// GET /api/entries/active — vehicles currently parked (for the exit picker)
+async function getActiveEntries(req, res) {
+  const { rows } = await pool.query(
+    `SELECT * FROM daily_entries WHERE status = 'ACTIVE' ORDER BY entry_time DESC`
+  );
+  return res.json({ success: true, entries: rows });
+}
+
+// POST /api/entries/:id/exit — marks a vehicle as exited
+async function markExit(req, res) {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE daily_entries SET status = 'EXITED', exit_time = NOW() WHERE id = $1 AND status = 'ACTIVE' RETURNING *`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Vehicle not found or already exited' });
+    }
+    return res.json({ success: true, entry: rows[0] });
+  } catch (err) {
+    console.error('[markExit]', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 module.exports = {
   verifyAndLog, quickCheckSubscriber, getEntries,
   postSubscriber, getSubscribers, getExpiringSubscribers,
   postExpense, getExpenses, getSummary, exportReport,
+  getActiveEntries, markExit,
 };
