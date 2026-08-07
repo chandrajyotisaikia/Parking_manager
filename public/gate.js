@@ -69,54 +69,83 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   if (!file) return;
 
   const statusEl = document.getElementById('ocrStatus');
-  statusEl.textContent = '☁️ Uploading to Cloud AI...';
+  statusEl.textContent = '🔄 Compressing image...';
 
   try {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     
-    reader.onload = async () => {
-      const base64Image = reader.result;
-      statusEl.textContent = '🔍 Scanning plate number...';
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      
+      img.onload = async () => {
+        // 1. Resize and compress using Canvas
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1024; // Shrink the image to max 1024px wide
+        const scaleSize = MAX_WIDTH / img.width;
+        
+        // Only resize if the image is actually larger than MAX_WIDTH
+        if (scaleSize < 1) {
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleSize;
+        } else {
+            canvas.width = img.width;
+            canvas.height = img.height;
+        }
 
-      const formData = new FormData();
-      formData.append('base64Image', base64Image);
-      // NOTE: 'helloworld' works for basic testing. 
-      // To prevent limits in production, get a free key at ocr.space and paste it here:
-      formData.append('apikey', 'helloworld'); 
-      formData.append('language', 'eng');
-      formData.append('OCREngine', '2'); // Engine 2 is optimized for special text layouts
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Convert to compressed JPEG (0.7 quality) - drastic size reduction
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        
+        statusEl.textContent = '☁️ Uploading to Cloud AI...';
 
-      const response = await fetch('https://api.ocr.space/parse/image', {
-        method: 'POST',
-        body: formData
-      });
+        const formData = new FormData();
+        formData.append('base64Image', compressedBase64);
+        
+        // IMPORTANT: Replace 'helloworld' with your own free API key from ocr.space
+        formData.append('apikey', 'helloworld'); 
+        formData.append('language', 'eng');
+        formData.append('OCREngine', '2');
 
-      const data = await response.json();
+        try {
+          const response = await fetch('https://api.ocr.space/parse/image', {
+            method: 'POST',
+            body: formData
+          });
 
-      if (data.IsErroredOnProcessing || !data.ParsedResults || data.ParsedResults.length === 0) {
-        statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
-        return;
-      }
+          const data = await response.json();
 
-      const rawText = data.ParsedResults[0].ParsedText || '';
-      const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          if (data.IsErroredOnProcessing || !data.ParsedResults || data.ParsedResults.length === 0) {
+            statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
+            return;
+          }
 
-      if (!cleaned) {
-        statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
-        return;
-      }
+          const rawText = data.ParsedResults[0].ParsedText || '';
+          const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-      document.getElementById('plateInput').value = cleaned;
-      statusEl.textContent = `✅ Recognized: "${cleaned}" — check it before confirming.`;
+          if (!cleaned) {
+            statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
+            return;
+          }
+
+          document.getElementById('plateInput').value = cleaned;
+          statusEl.textContent = `✅ Recognized: "${cleaned}" — check it before confirming.`;
+        } catch (uploadErr) {
+          console.error('[scan error]', uploadErr);
+          statusEl.textContent = "⚠️ Scan failed — network issue or API down.";
+        }
+      };
     };
     
     reader.onerror = () => {
       statusEl.textContent = "⚠️ Error reading image file.";
     };
   } catch (err) {
-    console.error('[scan error]', err);
-    statusEl.textContent = "⚠️ Scan failed — try typing the plate manually.";
+    console.error('[compression error]', err);
+    statusEl.textContent = "⚠️ Processing failed — try typing the plate manually.";
   } finally {
     e.target.value = '';
   }
@@ -249,4 +278,5 @@ async function submitExpense() {
   } catch (err) {
     resultEl.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
   }
-}
+  }
+    
