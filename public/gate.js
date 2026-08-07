@@ -1,5 +1,6 @@
-// gate.js — gate check-in screen: manual entry, camera Cloud OCR,
-// name locking, live charge preview, receipts, vehicle exit, expense logging, display settings.
+// gate.js — gate check-in screen: Live Camera Scanner with Guide Box, Center-Crop + Compression,
+// smart format enforcement (AA00AA0000), name locking, live charge preview,
+// receipts, vehicle exit, expense logging, display settings.
 
 let selectedType = 'CAR';
 
@@ -59,97 +60,138 @@ async function applyDisplaySettings() {
   }
 }
 
-// ---- Camera: Lightning Fast Cloud OCR (OCR.space) ----
-function startScan() {
-  document.getElementById('cameraInput').click();
+// ---- Smart Plate Formatter (AA00AA0000) ----
+function enforcePlateFormat(rawText) {
+  let plate = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (plate.length !== 10) return plate; 
+
+  let fixedPlate = '';
+  const formatMap = 'LLNNLLNNNN'; 
+
+  for (let i = 0; i < 10; i++) {
+    let char = plate[i];
+    let expectedType = formatMap[i];
+
+    if (expectedType === 'L') {
+      if (char === '0') char = 'O';
+      if (char === '1') char = 'I';
+      if (char === '5') char = 'S';
+      if (char === '8') char = 'B';
+      if (char === '2') char = 'Z';
+    } else if (expectedType === 'N') {
+      if (char === 'O') char = '0';
+      if (char === 'I') char = '1';
+      if (char === 'S') char = '5';
+      if (char === 'B') char = '8';
+      if (char === 'Z') char = '2';
+    }
+    fixedPlate += char;
+  }
+  return fixedPlate;
 }
 
-document.getElementById('cameraInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+// ---- LIVE CAMERA SCANNER (WebRTC) ----
+let videoStream = null;
 
+async function startScan() {
+  try {
+    // Request rear camera specifically
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    videoStream = stream;
+    const video = document.getElementById('liveVideo');
+    video.srcObject = stream;
+    
+    // Show the scanner UI
+    document.getElementById('scannerUI').style.display = 'flex';
+  } catch (err) {
+    console.error('Camera error:', err);
+    alert('Could not access camera. Please check browser permissions.');
+  }
+}
+
+function cancelScan() {
+  document.getElementById('scannerUI').style.display = 'none';
+  if (videoStream) {
+    videoStream.getTracks().forEach(track => track.stop());
+  }
+}
+
+async function captureAndScan() {
+  const video = document.getElementById('liveVideo');
   const statusEl = document.getElementById('ocrStatus');
-  statusEl.textContent = '🔄 Compressing image...';
+  statusEl.textContent = '✂️ Capturing plate...';
+
+  // 1. Draw current video frame to a hidden canvas
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = video.videoWidth;
+  fullCanvas.height = video.videoHeight;
+  const ctx = fullCanvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height);
+
+  // Stop camera and hide UI
+  cancelScan();
+  statusEl.textContent = '☁️ Uploading cropped plate to AI...';
+
+  // 2. Crop logic: Matches the CSS box overlay (Middle 80% W, 35% H)
+  const cropW = fullCanvas.width * 0.8;
+  const cropH = fullCanvas.height * 0.35;
+  const startX = (fullCanvas.width - cropW) / 2;
+  const startY = (fullCanvas.height - cropH) / 2;
+
+  const cropCanvas = document.createElement('canvas');
+  const MAX_WIDTH = 800; 
+  const scaleSize = MAX_WIDTH / cropW;
+  
+  if (scaleSize < 1) {
+      cropCanvas.width = MAX_WIDTH;
+      cropCanvas.height = cropH * scaleSize;
+  } else {
+      cropCanvas.width = cropW;
+      cropCanvas.height = cropH;
+  }
+
+  const cropCtx = cropCanvas.getContext('2d');
+  cropCtx.drawImage(fullCanvas, startX, startY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
+  
+  // 3. Compress to JPEG and upload
+  const compressedBase64 = cropCanvas.toDataURL('image/jpeg', 0.7);
+
+  const formData = new FormData();
+  formData.append('base64Image', compressedBase64);
+  formData.append('apikey', 'helloworld'); // Replace with real OCR.space key!
+  formData.append('language', 'eng');
+  formData.append('OCREngine', '2');
 
   try {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      
-      img.onload = async () => {
-        // 1. Resize and compress using Canvas
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1024; // Shrink the image to max 1024px wide
-        const scaleSize = MAX_WIDTH / img.width;
-        
-        // Only resize if the image is actually larger than MAX_WIDTH
-        if (scaleSize < 1) {
-            canvas.width = MAX_WIDTH;
-            canvas.height = img.height * scaleSize;
-        } else {
-            canvas.width = img.width;
-            canvas.height = img.height;
-        }
+    const response = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData
+    });
 
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        // Convert to compressed JPEG (0.7 quality) - drastic size reduction
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-        
-        statusEl.textContent = '☁️ Uploading to Cloud AI...';
+    const data = await response.json();
 
-        const formData = new FormData();
-        formData.append('base64Image', compressedBase64);
-        
-        // IMPORTANT: Replace 'helloworld' with your own free API key from ocr.space
-        formData.append('apikey', 'helloworld'); 
-        formData.append('language', 'eng');
-        formData.append('OCREngine', '2');
+    if (data.IsErroredOnProcessing || !data.ParsedResults || data.ParsedResults.length === 0) {
+      statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
+      return;
+    }
 
-        try {
-          const response = await fetch('https://api.ocr.space/parse/image', {
-            method: 'POST',
-            body: formData
-          });
+    const rawText = data.ParsedResults[0].ParsedText || '';
+    const smartCleaned = enforcePlateFormat(rawText);
 
-          const data = await response.json();
+    if (!smartCleaned) {
+      statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
+      return;
+    }
 
-          if (data.IsErroredOnProcessing || !data.ParsedResults || data.ParsedResults.length === 0) {
-            statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
-            return;
-          }
-
-          const rawText = data.ParsedResults[0].ParsedText || '';
-          const cleaned = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-          if (!cleaned) {
-            statusEl.textContent = "⚠️ Cloud AI couldn't read the plate — try typing it manually.";
-            return;
-          }
-
-          document.getElementById('plateInput').value = cleaned;
-          statusEl.textContent = `✅ Recognized: "${cleaned}" — check it before confirming.`;
-        } catch (uploadErr) {
-          console.error('[scan error]', uploadErr);
-          statusEl.textContent = "⚠️ Scan failed — network issue or API down.";
-        }
-      };
-    };
-    
-    reader.onerror = () => {
-      statusEl.textContent = "⚠️ Error reading image file.";
-    };
-  } catch (err) {
-    console.error('[compression error]', err);
-    statusEl.textContent = "⚠️ Processing failed — try typing the plate manually.";
-  } finally {
-    e.target.value = '';
+    document.getElementById('plateInput').value = smartCleaned;
+    statusEl.textContent = `✅ Recognized: "${smartCleaned}" — check it before confirming.`;
+  } catch (uploadErr) {
+    console.error('[scan error]', uploadErr);
+    statusEl.textContent = "⚠️ Scan failed — network issue or API down.";
   }
-});
+}
 
 // ---- Check-in submit ----
 let lastReceiptText = '';
@@ -278,5 +320,5 @@ async function submitExpense() {
   } catch (err) {
     resultEl.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
   }
-  }
-    
+}
+  
