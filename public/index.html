@@ -8,6 +8,34 @@
 <meta name="theme-color" content="#F5C518">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/style.css?v=4">
+<style>
+  /* Glowing Button Styles */
+  .glow-btn { transition: all 0.3s ease; }
+  .glow-btn.paid-active { 
+    background-color: #064e3b !important; 
+    border-color: #10b981 !important; 
+    color: #10b981 !important;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.6), inset 0 0 10px rgba(16, 185, 129, 0.2);
+  }
+  .glow-btn.unpaid-active { 
+    background-color: #450a0a !important; 
+    border-color: #ef4444 !important; 
+    color: #ef4444 !important;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.6), inset 0 0 10px rgba(239, 68, 68, 0.2);
+  }
+  #balanceWarning {
+    display: none;
+    background: #450a0a;
+    color: #ef4444;
+    padding: 12px;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    margin-top: 10px;
+    font-weight: bold;
+    text-align: center;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+  }
+</style>
 </head>
 <body>
 
@@ -23,6 +51,7 @@
 
   <div class="tabs">
     <div class="tab active" id="tabGate" onclick="showTab('gate')">Gate Entry</div>
+    <div class="tab" id="tabDues" onclick="showTab('dues')">Pending Dues</div>
     <div class="tab" id="tabExpense" onclick="showTab('expense')">Expenses</div>
   </div>
 
@@ -46,14 +75,15 @@
   <div id="gateSection">
     <div class="card">
       <label>Scan or Enter Plate</label>
-      
-      <!-- Native, conflict-free camera trigger -->
       <button class="scan" onclick="startScan()">📷 Scan Plate with Camera</button>
       <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
-      
       <div class="status" id="ocrStatus"></div>
 
-      <input type="text" id="plateInput" placeholder="e.g. AS01AB1234" autocapitalize="characters">
+      <!-- Added onblur event to trigger balance check when manually typing -->
+      <input type="text" id="plateInput" placeholder="e.g. AS01AB1234" autocapitalize="characters" onblur="checkBalance()">
+      
+      <!-- New Balance Warning Display -->
+      <div id="balanceWarning"></div>
 
       <label>Vehicle Type</label>
       <div class="type-row">
@@ -61,6 +91,13 @@
         <div class="type-btn" id="btnBike" onclick="selectType('BIKE')">🏍️ Bike</div>
       </div>
       <div id="chargePreview" class="status" style="margin-top:0;"></div>
+
+      <!-- New Payment Status Buttons -->
+      <label>Payment Status</label>
+      <div class="type-row" style="margin-bottom: 16px;">
+        <div class="type-btn glow-btn paid-active" id="btnPaid" onclick="selectPayment('PAID')">✅ PAID</div>
+        <div class="type-btn glow-btn" id="btnUnpaid" onclick="selectPayment('UNPAID')">❌ UNPAID</div>
+      </div>
 
       <button class="primary" onclick="checkIn()">✓ Check In Vehicle</button>
 
@@ -75,9 +112,18 @@
       </div>
     </div>
 
-    <!-- Register Subscriber Button -->
     <div class="card" style="margin-top: 16px;">
       <button class="primary" style="width:100%; padding:16px; font-size:16px; background-color:#2563EB; color:#fff; border:none; border-radius:8px;" onclick="window.location.href='/admin.html'">➕ Register Subscriber</button>
+    </div>
+  </div>
+
+  <!-- PENDING DUES (New Tab) -->
+  <div id="duesSection" style="display:none">
+    <div class="card">
+      <h3 style="margin-top:0; color:#ef4444;">Unpaid Vehicles</h3>
+      <button class="secondary" onclick="loadUnpaidVehicles()" style="margin-bottom: 16px;">🔄 Refresh List</button>
+      <div class="status" id="duesStatus">Click refresh to load unpaid entries...</div>
+      <div id="duesList"></div>
     </div>
   </div>
 
@@ -99,7 +145,7 @@
 
 <div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
 
-<script src="/gate.js?v=5"></script>
+<script src="/gate.js?v=6"></script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then(() => console.log('Service worker registered'));
