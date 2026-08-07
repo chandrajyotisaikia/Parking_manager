@@ -24,9 +24,11 @@ async function initDb() {
       is_subscriber BOOLEAN NOT NULL DEFAULT FALSE,
       amount_charged NUMERIC NOT NULL DEFAULT 0,
       entry_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      exit_time TIMESTAMPTZ,
       status TEXT DEFAULT 'ACTIVE',
       attendant_name TEXT
     );
+    ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS exit_time TIMESTAMPTZ;
     CREATE TABLE IF NOT EXISTS expenses (
       id SERIAL PRIMARY KEY,
       amount NUMERIC NOT NULL,
