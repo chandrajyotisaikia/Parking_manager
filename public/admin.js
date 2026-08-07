@@ -88,20 +88,29 @@ async function loadRenewalReminders() {
   </div>`;
 }
 
-// Subscription pricing preview — mirrors the server's rates so the admin sees the cost
-// before submitting. The server recalculates authoritatively, so this is display-only.
-const SUBSCRIPTION_MONTHLY_RATE = { CAR: 800, BIKE: 400 };
+// Subscription pricing preview 
+const SUBSCRIPTION_DAILY_RATE = { CAR: 80, BIKE: 40 };
 
 function updateSubAmountPreview() {
   const type = document.getElementById('newType').value;
   const start = document.getElementById('newStart').value;
   const end = document.getElementById('newEnd').value;
+  
+  // Grab the discount if it exists, otherwise default to 0
+  const discountInput = document.getElementById('newDiscount');
+  const discount = (discountInput && discountInput.value) ? parseInt(discountInput.value) : 0;
+  
   const el = document.getElementById('subAmountPreview');
+  
   if (!start || !end) { el.textContent = ''; return; }
+  
   const days = Math.max(1, Math.round((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)) + 1);
   if (days < 1) { el.textContent = 'End date must be after start date.'; return; }
-  const amount = Math.round((SUBSCRIPTION_MONTHLY_RATE[type] / 30) * days);
-  el.textContent = `💰 ${days} day(s) — Amount due: ₹${amount}`;
+  
+  const baseAmount = SUBSCRIPTION_DAILY_RATE[type] * days;
+  const finalAmount = Math.max(0, baseAmount - discount); // Prevents negative numbers
+  
+  el.textContent = `💰 ${days} day(s) @ ₹${SUBSCRIPTION_DAILY_RATE[type]}/day — Subtotal: ₹${baseAmount} | Discount: ₹${discount} | Final: ₹${finalAmount}`;
 }
 
 async function addSubscriber() {
@@ -112,6 +121,11 @@ async function addSubscriber() {
   const subscriptionStart = document.getElementById('newStart').value;
   const subscriptionEnd = document.getElementById('newEnd').value;
   const paymentStatus = document.getElementById('newPaymentStatus').value;
+  
+  // Grab the discount to send to the server
+  const discountInput = document.getElementById('newDiscount');
+  const discount = (discountInput && discountInput.value) ? parseInt(discountInput.value) : 0;
+  
   const resultEl = document.getElementById('addSubResult');
 
   if (!vehicleNumber || !ownerName || !subscriptionStart || !subscriptionEnd) {
@@ -122,12 +136,14 @@ async function addSubscriber() {
     const res = await fetch('/api/subscribers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, paymentStatus }),
+      body: JSON.stringify({ vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, paymentStatus, discount }), 
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
     resultEl.innerHTML = `<div class="result sub">Subscriber added. Amount due: ₹${data.amountDue} (${paymentStatus === 'PAID' ? 'Paid' : 'On credit'}).</div>`;
-    ['newPlate','newOwner','newPhone','newStart','newEnd'].forEach(id => document.getElementById(id).value = '');
+    ['newPlate','newOwner','newPhone','newStart','newEnd', 'newDiscount'].forEach(id => {
+      if(document.getElementById(id)) document.getElementById(id).value = '';
+    });
     document.getElementById('subAmountPreview').textContent = '';
     loadSubscribers();
     loadRenewalReminders();
