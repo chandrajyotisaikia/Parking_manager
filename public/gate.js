@@ -1,8 +1,28 @@
-// gate.js — gate check-in screen, payment status toggles, Cloud OCR, 
-// balance checking, receipts, vehicle exit, unpaid dues, and expense logging.
+// gate.js — gate check-in screen, instant payment status toggles, Cloud OCR, 
+// zero-lag balance checking, receipts, pay-and-exit, unpaid dues, and expense logging.
 
 let selectedType = 'CAR';
-let currentPaymentStatus = 'PAID'; // Default to paid
+let currentPaymentStatus = 'PAID';
+let unpaidPlatesCache = {}; // Instant memory for fast balance checks
+
+// ---- New: Secretly load unpaid list in background for zero-lag checking ----
+async function syncUnpaidCache() {
+  try {
+    const res = await fetch('/api/dues/unpaid');
+    const data = await res.json();
+    unpaidPlatesCache = {}; // Clear old data
+    if (data.entries) {
+      data.entries.forEach(e => {
+        if (!unpaidPlatesCache[e.vehicle_number]) unpaidPlatesCache[e.vehicle_number] = 0;
+        unpaidPlatesCache[e.vehicle_number] += parseFloat(e.amount_charged);
+      });
+    }
+  } catch (err) {
+    console.warn("Could not sync unpaid cache in background.");
+  }
+}
+// Run this immediately when the app opens
+syncUnpaidCache();
 
 function selectType(type) {
   selectedType = type;
@@ -33,7 +53,6 @@ function updateChargePreview() {
   if (el) el.textContent = `💰 Standard charge: ₹${amt} (free if subscriber)`;
 }
 
-// Crash-proof showTab logic
 function showTab(tab) {
   const gateSec = document.getElementById('gateSection');
   const duesSec = document.getElementById('duesSection');
@@ -93,27 +112,23 @@ async function applyDisplaySettings() {
   }
 }
 
-async function checkBalance() {
-  const plate = document.getElementById('plateInput').value.trim();
+// ---- Instant Zero-Lag Balance Check ----
+function checkBalance() {
+  const plate = document.getElementById('plateInput').value.trim().toUpperCase();
   const warningBox = document.getElementById('balanceWarning');
   
   if (!plate || !warningBox) return;
 
-  try {
-    const res = await fetch(`/api/dues/${plate}`);
-    const data = await res.json();
-    
-    if (data.success && data.totalDue > 0) {
-      warningBox.textContent = `⚠️ PREVIOUS BALANCE DUE: ₹${data.totalDue}`;
-      warningBox.style.display = 'block';
-    } else {
-      warningBox.style.display = 'none';
-    }
-  } catch (err) {
-    console.warn('Could not fetch balance:', err);
+  // Instantly checks the local memory instead of asking the server
+  if (unpaidPlatesCache[plate] && unpaidPlatesCache[plate] > 0) {
+    warningBox.textContent = `⚠️ PREVIOUS BALANCE DUE: ₹${unpaidPlatesCache[plate]}`;
+    warningBox.style.display = 'block';
+  } else {
+    warningBox.style.display = 'none';
   }
 }
 
+// ---- Camera: Fast Cloud OCR ----
 function startScan() {
   const cameraInput = document.getElementById('cameraInput');
   if (cameraInput) {
@@ -140,20 +155,16 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
       img.onload = async () => {
         const canvas = document.createElement('canvas');
         const MAX_WIDTH = 1024;
-        const MAX_HEIGHT = 1024;
-        let width = img.width;
-        let height = img.height;
+        let width = img.width, height = img.height;
 
         if (width > height) {
           if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
         } else {
-          if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+          if (height > MAX_WIDTH) { width *= MAX_WIDTH / height; height = MAX_WIDTH; }
         }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
         
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
         if (statusEl) statusEl.textContent = '☁️ Reading plate number...';
@@ -165,11 +176,7 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
         formData.append('OCREngine', '2'); 
 
         try {
-          const response = await fetch('https://api.ocr.space/parse/image', {
-            method: 'POST',
-            body: formData
-          });
-
+          const response = await fetch('https://api.ocr.space/parse/image', { method: 'POST', body: formData });
           const data = await response.json();
 
           if (data.IsErroredOnProcessing || !data.ParsedResults || data.ParsedResults.length === 0) {
@@ -188,10 +195,9 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
           document.getElementById('plateInput').value = cleaned;
           if (statusEl) statusEl.textContent = `✅ Recognized: "${cleaned}"`;
           
-          checkBalance();
+          checkBalance(); // Instantly trigger the local check!
           
         } catch (apiErr) {
-          console.error('API Error:', apiErr);
           if (statusEl) statusEl.textContent = "⚠️ Connection error. Please type the plate.";
         }
       };
@@ -200,8 +206,7 @@ document.getElementById('cameraInput').addEventListener('change', async (e) => {
   } catch (err) {
     if (statusEl) statusEl.textContent = "⚠️ Camera failed. Please type manually.";
   } finally {
-    e.target.value = ''; 
-    e.target.style.display = 'none'; 
+    e.target.value = ''; e.target.style.display = 'none'; 
   }
 });
 
@@ -246,7 +251,9 @@ async function checkIn() {
     const statusEl = document.getElementById('ocrStatus');
     if (statusEl) statusEl.textContent = '';
     if (warningBox) warningBox.style.display = 'none';
+    
     selectPayment('PAID'); 
+    syncUnpaidCache(); // Refresh the secret list in case they checked in unpaid
     
   } catch (err) {
     if (resultBox) resultBox.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
@@ -263,6 +270,7 @@ async function shareReceipt() {
   catch (err) { alert(lastReceiptText); }
 }
 
+// ---- UPGRADED: Mark vehicle exit (With Pay & Exit Buttons) ----
 let exitPanelOpen = false;
 async function toggleExitPanel() {
   exitPanelOpen = !exitPanelOpen;
@@ -285,12 +293,20 @@ async function loadActiveVehicles() {
       return; 
     }
     
-    if (statusEl) statusEl.textContent = `${data.entries.length} vehicle(s) currently parked. Tap one to check out:`;
+    if (statusEl) statusEl.textContent = `${data.entries.length} vehicle(s) currently parked. Tap to check out:`;
     if (listEl) {
       listEl.innerHTML = data.entries.map(e => `
-        <div class="type-btn" style="text-align:left; margin-bottom:8px; border-color:${e.payment_status === 'UNPAID' ? '#ef4444' : '#555'}" onclick="confirmExit(${e.id}, '${e.vehicle_number}')">
-          ${e.vehicle_number} — ${e.vehicle_type} 
-          ${e.payment_status === 'UNPAID' ? '<span style="color:#ef4444; float:right;">(UNPAID)</span>' : ''}
+        <div class="card" style="margin-bottom:12px; border: 2px solid ${e.payment_status === 'UNPAID' ? '#ef4444' : '#333'}; padding: 12px; background: #1a1a1a;">
+          <div style="font-weight:bold; font-size:18px; margin-bottom: 12px; color: #F5C518;">
+            ${e.vehicle_number} — ${e.vehicle_type}
+            ${e.payment_status === 'UNPAID' ? `<span style="color:#ef4444; float:right;">(OWES ₹${e.amount_charged})</span>` : '<span style="color:#10b981; float:right;">(PAID)</span>'}
+          </div>
+          <div style="display:flex; gap:10px;">
+            ${e.payment_status === 'UNPAID' 
+              ? `<button class="primary" style="background:#10b981; flex:1; padding:12px; font-size:16px; font-weight:bold; color:#000;" onclick="payAndExit(${e.id}, '${e.vehicle_number}')">💰 Pay & Exit</button>` 
+              : `<button class="secondary" style="flex:1; padding:12px; font-size:16px;" onclick="confirmExit(${e.id}, '${e.vehicle_number}')">🚪 Normal Exit</button>`
+            }
+          </div>
         </div>
       `).join('');
     }
@@ -299,6 +315,27 @@ async function loadActiveVehicles() {
   }
 }
 
+// New: All-in-one button to take the money and clear the car from the lot!
+async function payAndExit(entryId, plate) {
+  if (!confirm(`Collect cash and mark ${plate} as PAID & EXITED?`)) return;
+  const statusEl = document.getElementById('exitStatus');
+  try {
+    // 1. Mark as Paid
+    await fetch(`/api/entries/${entryId}/pay`, { method: 'POST' });
+    // 2. Mark as Exited
+    const res = await fetch(`/api/entries/${entryId}/exit`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Unknown error');
+    
+    if (statusEl) statusEl.textContent = `✅ ${plate} paid and checked out.`;
+    await loadActiveVehicles(); // Refresh the list
+    syncUnpaidCache(); // Update the secret balance checker
+  } catch (err) { 
+    if (statusEl) statusEl.textContent = `Error: ${err.message}`; 
+  }
+}
+
+// Standard exit for cars that already paid
 async function confirmExit(entryId, plate) {
   if (!confirm(`Confirm exit for ${plate}?`)) return;
   const statusEl = document.getElementById('exitStatus');
@@ -306,6 +343,7 @@ async function confirmExit(entryId, plate) {
     const res = await fetch(`/api/entries/${entryId}/exit`, { method: 'POST' });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
+    
     if (statusEl) statusEl.textContent = `✅ ${plate} checked out.`;
     await loadActiveVehicles();
   } catch (err) { 
@@ -313,6 +351,7 @@ async function confirmExit(entryId, plate) {
   }
 }
 
+// ---- Pending Dues Tab Logic ----
 async function loadUnpaidVehicles() {
   const statusEl = document.getElementById('duesStatus');
   const listEl = document.getElementById('duesList');
@@ -334,7 +373,7 @@ async function loadUnpaidVehicles() {
         <div class="card" style="margin-bottom:8px; padding:12px; border-color:#ef4444;">
           <div style="font-size:18px; font-weight:bold; color:#F5C518;">${e.vehicle_number}</div>
           <div style="color:#aaa; font-size:14px; margin-bottom:10px;">Date: ${new Date(e.entry_time).toLocaleString('en-IN')} <br> Amount Due: ₹${e.amount_charged}</div>
-          <button class="primary" style="background:#10b981; padding:10px; width:100%;" onclick="settleDues(${e.id}, '${e.vehicle_number}')">💰 Mark as Paid</button>
+          <button class="primary" style="background:#10b981; padding:10px; width:100%; color:#000; font-weight:bold;" onclick="settleDues(${e.id}, '${e.vehicle_number}')">💰 Mark as Paid</button>
         </div>
       `).join('');
     }
@@ -353,11 +392,13 @@ async function settleDues(entryId, plate) {
     
     alert(`Successfully marked ${plate} as PAID.`);
     loadUnpaidVehicles(); 
+    syncUnpaidCache(); // Keep our zero-lag memory accurate
   } catch (err) {
     alert(`Error: ${err.message}`);
   }
 }
 
+// ---- Expense logging ----
 async function submitExpense() {
   const amount = document.getElementById('expAmount').value;
   const description = document.getElementById('expDesc').value.trim();
@@ -386,5 +427,5 @@ async function submitExpense() {
   } catch (err) {
     if (resultEl) resultEl.innerHTML = `<div class="result paid">Error: ${err.message}</div>`;
   }
-                                                                         }
-          
+    }
+      
