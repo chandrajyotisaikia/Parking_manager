@@ -4,8 +4,8 @@ const PRICING = {
   BIKE: { SUBSCRIBER: 0, NON_SUBSCRIBER: 40 },
 };
 
-// Monthly subscription rates — used to calculate what a subscriber owes for their chosen period
-const SUBSCRIPTION_MONTHLY_RATE = { CAR: 800, BIKE: 400 };
+// Daily subscription rates
+const SUBSCRIPTION_DAILY_RATE = { CAR: 80, BIKE: 40 };
 
 function calculateCharge(vehicleType, isSubscriber) {
   const type = vehicleType.toUpperCase();
@@ -13,15 +13,19 @@ function calculateCharge(vehicleType, isSubscriber) {
   return isSubscriber ? PRICING[type].SUBSCRIBER : PRICING[type].NON_SUBSCRIBER;
 }
 
-// Prorates the monthly rate by the number of days between start and end (inclusive)
-function calculateSubscriptionAmount(vehicleType, startDate, endDate) {
+// Calculates the amount based on daily rate and applies discount
+function calculateSubscriptionAmount(vehicleType, startDate, endDate, discount = 0) {
   const type = vehicleType.toUpperCase();
-  if (!SUBSCRIPTION_MONTHLY_RATE[type]) throw new Error('Invalid vehicle type: ' + vehicleType);
+  if (!SUBSCRIPTION_DAILY_RATE[type]) throw new Error('Invalid vehicle type: ' + vehicleType);
+  
   const start = new Date(startDate);
   const end = new Date(endDate);
   const days = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1);
-  const dailyRate = SUBSCRIPTION_MONTHLY_RATE[type] / 30;
-  return Math.round(dailyRate * days);
+  
+  const baseAmount = SUBSCRIPTION_DAILY_RATE[type] * days;
+  const finalAmount = Math.max(0, baseAmount - discount); // Ensures no negative amounts
+  
+  return finalAmount;
 }
 
-module.exports = { calculateCharge, calculateSubscriptionAmount, SUBSCRIPTION_MONTHLY_RATE };
+module.exports = { calculateCharge, calculateSubscriptionAmount, SUBSCRIPTION_DAILY_RATE };
