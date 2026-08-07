@@ -34,8 +34,10 @@
     <label>Attendant Name</label>
     <input type="text" id="attendantName" placeholder="Your name">
     <button class="secondary" id="confirmNameBtn" style="margin-top:10px;" onclick="confirmName()">Confirm Name</button>
-    <div id="nameLockedRow" style="display:none; margin-top:10px; font-size:13px; color:#aaa;">
-      Locked as <strong id="lockedNameDisplay"></strong>. <a href="#" onclick="unlockName(); return false;" style="color:#F5C518;">Edit</a>
+    
+    <!-- Updated to show Welcome message and removed the Edit button -->
+    <div id="nameLockedRow" style="display:none; margin-top:10px; font-size:18px; color:#F5C518; font-weight:bold;">
+      Welcome, <strong id="lockedNameDisplay"></strong>!
     </div>
   </div>
 
@@ -69,6 +71,11 @@
         <div class="status" id="exitStatus">Loading parked vehicles...</div>
         <div id="exitList"></div>
       </div>
+    </div>
+
+    <!-- Added Register Subscriber Button -->
+    <div class="card" style="margin-top: 16px;">
+      <button class="primary" style="width:100%; padding:16px; font-size:16px; background-color:#2563EB; color:#fff; border:none; border-radius:8px;" onclick="window.location.href='/admin.html'">➕ Register Subscriber</button>
     </div>
   </div>
 
