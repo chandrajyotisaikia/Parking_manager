@@ -79,10 +79,10 @@
       <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
       <div class="status" id="ocrStatus"></div>
 
-      <!-- Added onblur event to trigger balance check when manually typing -->
+      <!-- triggers balance check when manually typing -->
       <input type="text" id="plateInput" placeholder="e.g. AS01AB1234" autocapitalize="characters" onblur="checkBalance()">
       
-      <!-- New Balance Warning Display -->
+      <!-- Balance Warning Display -->
       <div id="balanceWarning"></div>
 
       <label>Vehicle Type</label>
@@ -92,7 +92,7 @@
       </div>
       <div id="chargePreview" class="status" style="margin-top:0;"></div>
 
-      <!-- New Payment Status Buttons -->
+      <!-- Payment Status Buttons -->
       <label>Payment Status</label>
       <div class="type-row" style="margin-bottom: 16px;">
         <div class="type-btn glow-btn paid-active" id="btnPaid" onclick="selectPayment('PAID')">✅ PAID</div>
@@ -117,7 +117,7 @@
     </div>
   </div>
 
-  <!-- PENDING DUES (New Tab) -->
+  <!-- PENDING DUES -->
   <div id="duesSection" style="display:none">
     <div class="card">
       <h3 style="margin-top:0; color:#ef4444;">Unpaid Vehicles</h3>
@@ -145,7 +145,7 @@
 
 <div class="footer">© 2026 Tulon's Parking — Built by Chandrajyoti Saikia</div>
 
-<script src="/gate.js?v=6"></script>
+<script src="/gate.js?v=7"></script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then(() => console.log('Service worker registered'));
