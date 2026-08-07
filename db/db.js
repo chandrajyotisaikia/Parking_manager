@@ -15,8 +15,14 @@ async function initDb() {
       owner_name TEXT NOT NULL,
       phone TEXT,
       vehicle_type TEXT NOT NULL,
-      subscription_end DATE NOT NULL
+      subscription_start DATE,
+      subscription_end DATE NOT NULL,
+      amount_due NUMERIC DEFAULT 0,
+      payment_status TEXT DEFAULT 'PAID'
     );
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS subscription_start DATE;
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS amount_due NUMERIC DEFAULT 0;
+    ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'PAID';
     CREATE TABLE IF NOT EXISTS daily_entries (
       id SERIAL PRIMARY KEY,
       vehicle_number TEXT NOT NULL,
