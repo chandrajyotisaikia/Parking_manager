@@ -1,5 +1,5 @@
-// sw.js — Basic Service Worker to allow PWA Installation
-const CACHE_NAME = 'parkpro-v1';
+// sw.js — Service Worker (Network First Strategy)
+const CACHE_NAME = 'parkpro-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -8,8 +8,9 @@ const ASSETS = [
   '/manifest.json'
 ];
 
-// Install the service worker and cache the core files
+// Install and immediately take over
 self.addEventListener('install', (e) => {
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
@@ -17,11 +18,25 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// Serve cached files when loading the app
+// Clean up old caches when a new version activates
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keyList) => {
+      return Promise.all(keyList.map((key) => {
+        if (key !== CACHE_NAME) {
+          return caches.delete(key);
+        }
+      }));
+    })
+  );
+  return self.clients.claim();
+});
+
+// Network First, fallback to cache if offline
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((response) => {
-      return response || fetch(e.request);
+    fetch(e.request).catch(() => {
+      return caches.match(e.request);
     })
   );
 });
