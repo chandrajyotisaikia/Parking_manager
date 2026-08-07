@@ -7,7 +7,7 @@ const { getSettings, updateSettings } = require('../services/settings.service');
 
 // POST /api/verify-and-log
 async function verifyAndLog(req, res) {
-  const { vehicleNumber, vehicleType, attendantName } = req.body;
+  const { vehicleNumber, vehicleType, attendantName, paymentStatus } = req.body;
   if (!vehicleNumber || !vehicleType) {
     return res.status(400).json({ success: false, error: 'vehicleNumber and vehicleType are required' });
   }
@@ -17,10 +17,13 @@ async function verifyAndLog(req, res) {
     const amount = calculateCharge(vehicleType, isSubscriber);
     const plate = vehicleNumber.toUpperCase().replace(/\s+/g, '');
 
+    // Default to PAID if the frontend didn't send a status
+    const finalPaymentStatus = isSubscriber ? 'PAID' : (paymentStatus || 'PAID');
+
     const { rows } = await pool.query(
-      `INSERT INTO daily_entries (vehicle_number, vehicle_type, is_subscriber, amount_charged, attendant_name)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [plate, vehicleType.toUpperCase(), isSubscriber, amount, attendantName || '']
+      `INSERT INTO daily_entries (vehicle_number, vehicle_type, is_subscriber, amount_charged, attendant_name, payment_status)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [plate, vehicleType.toUpperCase(), isSubscriber, amount, attendantName || '', finalPaymentStatus]
     );
     const entry = rows[0];
 
@@ -61,12 +64,14 @@ async function getEntries(req, res) {
 
 // POST /api/subscribers
 async function postSubscriber(req, res) {
-  const { vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, paymentStatus } = req.body;
+  // Includes the discount variable from our earlier update!
+  const { vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, paymentStatus, discount } = req.body;
   if (!vehicleNumber || !ownerName || !vehicleType || !subscriptionStart || !subscriptionEnd) {
     return res.status(400).json({ success: false, error: 'Missing required fields' });
   }
   try {
-    const amountDue = calculateSubscriptionAmount(vehicleType, subscriptionStart, subscriptionEnd);
+    const parsedDiscount = parseInt(discount) || 0;
+    const amountDue = calculateSubscriptionAmount(vehicleType, subscriptionStart, subscriptionEnd, parsedDiscount);
     const sub = await addSubscriber({ vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, amountDue, paymentStatus });
     return res.status(201).json({ success: true, subscriber: sub, amountDue });
   } catch (err) {
@@ -79,7 +84,7 @@ async function getSubscribers(req, res) {
   return res.json({ success: true, subscribers: await listSubscribers() });
 }
 
-// GET /api/subscribers/expiring?days=7 — Upgrade: renewal reminders
+// GET /api/subscribers/expiring?days=7
 async function getExpiringSubscribers(req, res) {
   const days = parseInt(req.query.days) || 7;
   return res.json({ success: true, subscribers: await listExpiringSubscribers(days) });
@@ -100,7 +105,7 @@ async function getExpenses(req, res) {
   return res.json({ success: true, expenses: await listExpenses() });
 }
 
-// GET /api/summary — totals for the desktop dashboard
+// GET /api/summary
 async function getSummary(req, res) {
   const { rows } = await pool.query(`SELECT COALESCE(SUM(amount_charged),0) as total FROM daily_entries`);
   const income = parseFloat(rows[0].total);
@@ -108,7 +113,7 @@ async function getSummary(req, res) {
   return res.json({ success: true, totalIncome: income, totalExpenses: expenses, net: income - expenses });
 }
 
-// GET /api/export?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD — max 31 days
+// GET /api/export
 async function exportReport(req, res) {
   const { startDate, endDate } = req.query;
   if (!startDate || !endDate) {
@@ -136,12 +141,12 @@ async function exportReport(req, res) {
   const expenses = expensesRes.rows;
 
   const rows = [];
-  rows.push(['Type', 'Date/Time', 'Vehicle/Description', 'Category', 'Attendant', 'Amount (Rs)']);
+  rows.push(['Type', 'Date/Time', 'Vehicle/Description', 'Category', 'Attendant', 'Amount (Rs)', 'Payment Status']);
   entries.forEach(e => {
-    rows.push(['Income', e.entry_time, e.vehicle_number, e.is_subscriber ? 'Subscriber' : e.vehicle_type, e.attendant_name || '', e.amount_charged]);
+    rows.push(['Income', e.entry_time, e.vehicle_number, e.is_subscriber ? 'Subscriber' : e.vehicle_type, e.attendant_name || '', e.amount_charged, e.payment_status || 'PAID']);
   });
   expenses.forEach(e => {
-    rows.push(['Expense', e.expense_date, e.description, '-', e.attendant_name || '', -e.amount]);
+    rows.push(['Expense', e.expense_date, e.description, '-', e.attendant_name || '', -e.amount, 'PAID']);
   });
 
   const totalIncome = entries.reduce((s, e) => s + parseFloat(e.amount_charged), 0);
@@ -158,7 +163,7 @@ async function exportReport(req, res) {
   return res.send(csv);
 }
 
-// GET /api/entries/active — vehicles currently parked (for the exit picker)
+// GET /api/entries/active
 async function getActiveEntries(req, res) {
   const { rows } = await pool.query(
     `SELECT * FROM daily_entries WHERE status = 'ACTIVE' ORDER BY entry_time DESC`
@@ -166,7 +171,7 @@ async function getActiveEntries(req, res) {
   return res.json({ success: true, entries: rows });
 }
 
-// POST /api/entries/:id/exit — marks a vehicle as exited
+// POST /api/entries/:id/exit
 async function markExit(req, res) {
   const { id } = req.params;
   try {
@@ -184,15 +189,58 @@ async function markExit(req, res) {
   }
 }
 
-// GET /api/settings — current display settings
+// GET /api/settings
 async function getSettingsHandler(req, res) {
   return res.json({ success: true, settings: await getSettings() });
 }
 
-// POST /api/settings — update display settings (used by the admin dashboard)
+// POST /api/settings
 async function postSettingsHandler(req, res) {
   const updated = await updateSettings(req.body);
   return res.json({ success: true, settings: updated });
+}
+
+// GET /api/dues/unpaid
+async function getUnpaidEntries(req, res) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM daily_entries WHERE payment_status = 'UNPAID' ORDER BY entry_time DESC`
+    );
+    return res.json({ success: true, entries: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// GET /api/dues/:plate
+async function checkBalance(req, res) {
+  const { plate } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT SUM(amount_charged) as total FROM daily_entries WHERE vehicle_number = $1 AND payment_status = 'UNPAID'`, 
+      [plate.toUpperCase()]
+    );
+    return res.json({ success: true, totalDue: rows[0].total || 0 });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+// POST /api/entries/:id/pay
+async function markPaid(req, res) {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE daily_entries SET payment_status = 'PAID' WHERE id = $1 RETURNING *`, 
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Entry not found' });
+    }
+    return res.json({ success: true, entry: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 }
 
 module.exports = {
@@ -201,4 +249,6 @@ module.exports = {
   postExpense, getExpenses, getSummary, exportReport,
   getActiveEntries, markExit,
   getSettingsHandler, postSettingsHandler,
+  getUnpaidEntries, checkBalance, markPaid
 };
+               
