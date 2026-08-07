@@ -10,12 +10,12 @@ async function checkSubscriber(vehicleNumber) {
   return rows[0] || null;
 }
 
-async function addSubscriber({ vehicleNumber, ownerName, phone, vehicleType, subscriptionEnd }) {
+async function addSubscriber({ vehicleNumber, ownerName, phone, vehicleType, subscriptionStart, subscriptionEnd, amountDue, paymentStatus }) {
   const plate = vehicleNumber.toUpperCase().replace(/\s+/g, '');
   const { rows } = await pool.query(
-    `INSERT INTO subscribers (vehicle_number, owner_name, phone, vehicle_type, subscription_end)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [plate, ownerName, phone || '', vehicleType.toUpperCase(), subscriptionEnd]
+    `INSERT INTO subscribers (vehicle_number, owner_name, phone, vehicle_type, subscription_start, subscription_end, amount_due, payment_status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    [plate, ownerName, phone || '', vehicleType.toUpperCase(), subscriptionStart, subscriptionEnd, amountDue, paymentStatus || 'PAID']
   );
   return rows[0];
 }
