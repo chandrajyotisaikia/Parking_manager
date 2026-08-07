@@ -23,6 +23,7 @@ async function initDb() {
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS subscription_start DATE;
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS amount_due NUMERIC DEFAULT 0;
     ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'PAID';
+    
     CREATE TABLE IF NOT EXISTS daily_entries (
       id SERIAL PRIMARY KEY,
       vehicle_number TEXT NOT NULL,
@@ -32,13 +33,17 @@ async function initDb() {
       entry_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       exit_time TIMESTAMPTZ,
       status TEXT DEFAULT 'ACTIVE',
-      attendant_name TEXT
+      attendant_name TEXT,
+      payment_status TEXT DEFAULT 'PAID'
     );
     ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS exit_time TIMESTAMPTZ;
+    ALTER TABLE daily_entries ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'PAID';
+    
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY,
       value TEXT
     );
+    
     CREATE TABLE IF NOT EXISTS expenses (
       id SERIAL PRIMARY KEY,
       amount NUMERIC NOT NULL,
